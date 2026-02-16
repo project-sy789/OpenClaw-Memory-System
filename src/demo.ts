@@ -11,16 +11,22 @@ async function runDemo() {
     console.log('--- 🧠 OpenClaw Memory System Demo (Delegated AI) ---');
 
     // Detect available brain (Minimax, Anthropic-gateway, or OpenAI)
-    const isMinimax = !!(process.env.MINIMAX_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
-    const apiKey = process.env.MINIMAX_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || process.env.OPENAI_API_KEY;
-    const baseUrl = process.env.MINIMAX_BASE_URL || process.env.ANTHROPIC_BASE_URL || (isMinimax ? 'https://api.minimax.chat/v1' : undefined) || process.env.OPENAI_BASE_URL;
+    const minimaxKey = process.env.MINIMAX_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN;
+    const isMinimax = !!minimaxKey;
+    const apiKey = minimaxKey || process.env.OPENAI_API_KEY;
+
+    // Auto-detect International vs Domestic Minimax
+    const isInternational = minimaxKey?.startsWith('sk-');
+    const defaultMinimaxBase = isInternational ? 'https://api.minimaxi.chat/v1' : 'https://api.minimax.chat/v1';
+
+    const baseUrl = process.env.MINIMAX_BASE_URL || process.env.ANTHROPIC_BASE_URL || (isMinimax ? defaultMinimaxBase : undefined) || process.env.OPENAI_BASE_URL;
 
     if (!apiKey) {
         console.error('ERROR: No AI Brain found! (Please set MINIMAX_API_KEY, ANTHROPIC_AUTH_TOKEN or OPENAI_API_KEY)');
         return;
     }
 
-    console.log(`🔌 Connecting OpenClaw to Brain: ${isMinimax ? 'Minimax' : 'OpenAI'}`);
+    console.log(`🔌 Connecting OpenClaw to Brain: ${isMinimax ? `Minimax (${isInternational ? 'International' : 'Domestic'})` : 'OpenAI'}`);
 
     // Select models based on provider
     const chatModel = isMinimax ? (process.env.LLM_MODEL || 'abab6.5s-chat') : 'gpt-4o-mini';

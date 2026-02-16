@@ -24,7 +24,9 @@
     "test:watch": "vitest",
     "demo": "tsx src/demo.ts",
     "setup": "ts-node scripts/setup.ts",
-    "lint": "eslint src/"
+    "health": "ts-node src/scripts/health-check.ts",
+    "update": "git pull && npm install && npm run build",
+    "lint": "eslint src/**/*.ts"
   },
   "keywords": [
     "ai",

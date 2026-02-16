@@ -234,3 +234,15 @@ export interface DecayResult {
     memoriesDeleted: number;
     tokensFreed: number;
 }
+
+/** Health check status */
+export interface HealthStatus {
+    status: 'ok' | 'degraded' | 'error';
+    components: {
+        database: { status: 'ok' | 'error'; details?: string };
+        embeddingProvider: { status: 'ok' | 'error'; latency?: number; message?: string };
+        llmProvider: { status: 'ok' | 'error'; latency?: number; message?: string };
+    };
+    version: string;
+    timestamp: string;
+}

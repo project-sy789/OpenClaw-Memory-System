@@ -137,8 +137,16 @@ npm run demo
 |--------|-------------|
 | `consolidate()` | Merge + summarize + deduplicate memories |
 | `decay()` | Apply memory decay (forgetting curve) |
+| `health()` | Check system status (DB, Embedder, LLM) |
 | `merge()` | Merge related memory files |
 | `stats()` | Get memory statistics |
+
+### Health Check
+Run a quick diagnostic to verify connections:
+
+```bash
+npm run health
+```
 | `printStats()` | Pretty-print statistics |
 
 ### RecallOptions

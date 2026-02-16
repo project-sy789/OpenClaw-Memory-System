@@ -381,6 +381,178 @@ export class OpenClawMemory {
         this.storage.close();
         logger.info('OpenClaw Memory System closed');
     }
+
+    // ============================================================
+    // Health Check
+    // ============================================================
+
+    /**
+     * Check operational status of all subsystems.
+     */
+    async health(): Promise<import('./types').HealthStatus> {
+        const start = Date.now();
+        const status: import('./types').HealthStatus = {
+            status: 'ok',
+            components: {
+                database: { status: 'ok' },
+                embeddingProvider: { status: 'ok' },
+                llmProvider: { status: 'ok' },
+            },
+            version: '1.0.0',
+            timestamp: new Date().toISOString(),
+        };
+
+        // 1. Check Database
+        try {
+            // Simple query to verify connection
+            this.storage.getStats();
+        } catch (e: any) {
+            status.components.database = { status: 'error', details: e.message };
+            status.status = 'error';
+        }
+
+        // 2. Check Embedding Provider
+        try {
+            const eStart = Date.now();
+            await this.embedder.embedQuery('ping');
+            status.components.embeddingProvider.latency = Date.now() - eStart;
+        } catch (e: any) {
+            status.components.embeddingProvider = {
+                status: 'error',
+                message: e.message || 'Connection failed',
+            };
+            status.status = 'degraded'; // System can still work read-only maybe? or partial
+        }
+
+        // 3. Check LLM Provider
+        try {
+            const lStart = Date.now();
+            // Header injector uses the LLM provider config
+            await this.headerInjector.generateHeader('ping test content', '(ping)');
+            // Attempt a lightweight generation if possible, or just assume ok if we successfully called above
+            // Actually generateHeader with 'ping test content' might trigger LLM if not hitting cache
+            // To force a check we might need a dedicated ping method on injector, but generic is ok for now.
+            // We can use a trick: force generation of a header for a random string
+            await this.headerInjector.generateHeader('ping-' + Math.random());
+            status.components.llmProvider.latency = Date.now() - lStart;
+        } catch (e: any) {
+            status.components.llmProvider = {
+                status: 'error',
+                message: e.message || 'Connection failed',
+            };
+            status.status = 'degraded';
+        }
+
+        return status;
+    }
+
+    // ============================================================
+    // Runtime Config Update
+    // ============================================================
+
+    /**
+     * Update configuration at runtime (Hot-Swap).
+     * Useful for rotating keys or switching providers without restart.
+     */
+    async updateConfig(newConfig: Partial<OpenClawMemoryConfig>): Promise<void> {
+        logger.info('Updating configuration...');
+
+        // 1. Merge Config
+        this.config = { ...this.config, ...newConfig } as Required<OpenClawMemoryConfig>;
+
+        // 2. Update Log Level
+        if (newConfig.logLevel) {
+            setLogLevel(newConfig.logLevel);
+        }
+
+        // 3. Re-initialize Embedding Provider if changed
+        // We check if any embedding-related config is present in the update
+        if (
+            newConfig.embeddingProvider ||
+            newConfig.embeddingModel ||
+            newConfig.openaiApiKey ||
+            newConfig.openaiBaseUrl // Legacy fields might affect this
+        ) {
+            logger.info('Re-initializing Embedding Engine...');
+            // Re-resolve to get correct fallbacks
+            const resolved = resolveConfig(this.config);
+            const embedConfig = resolved.embeddingProvider!;
+
+            // Recreate instance
+            this.embedder = new EmbeddingEngine(
+                embedConfig.apiKey,
+                embedConfig.model || 'text-embedding-3-small',
+                embedConfig.dimensions || 1536,
+                this.storage,
+                embedConfig.baseUrl
+            );
+
+            // Re-configure retry logic
+            this.embedder.configure(
+                this.config.maxRetries,
+                this.config.retryDelay,
+                this.config.batchSize
+            );
+
+            // Update references in other components
+            this.merger = new AutoMerger(
+                this.markdown,
+                this.embedder, // New instance
+                this.config.mergeThreshold
+            );
+            this.semanticMemory = new SemanticMemory(
+                this.storage,
+                this.embedder, // New instance
+                this.chunker,
+                this.headerInjector
+            );
+            this.proceduralMemory = new ProceduralMemory(
+                this.storage,
+                this.embedder // New instance
+            );
+            this.search = new HybridSearch(
+                this.storage,
+                this.embedder // New instance
+            );
+
+            // Update Consolidator
+            this.consolidator = new Consolidator(
+                this.storage,
+                this.episodicMemory,
+                this.semanticMemory, // New instance inside
+                this.merger,        // New instance
+                this.embedder       // New instance
+            );
+        }
+
+        // 4. Re-initialize LLM Provider if changed
+        if (
+            newConfig.llmProvider ||
+            newConfig.openaiApiKey ||
+            newConfig.openaiBaseUrl
+        ) {
+            logger.info('Re-initializing LLM Provider (HeaderInjector)...');
+            const resolved = resolveConfig(this.config);
+            const llmConfig = resolved.llmProvider!;
+
+            this.headerInjector = new HeaderInjector(
+                llmConfig.apiKey,
+                true,
+                llmConfig.baseUrl,
+                llmConfig.model
+            );
+
+            // Update references
+            this.semanticMemory = new SemanticMemory(
+                this.storage,
+                this.embedder,
+                this.chunker,
+                this.headerInjector // New instance
+            );
+        }
+
+        logger.info('Configuration updated successfully.');
+    }
 }
 
 // Re-export types for consumers

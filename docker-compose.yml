@@ -44,7 +44,7 @@ services:
     build: .
     container_name: openclaw-memory-api
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - ./memory:/app/memory
       - ./logs:/app/logs

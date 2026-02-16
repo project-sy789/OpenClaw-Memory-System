@@ -10,16 +10,19 @@ dotenv.config();
 async function runDemo() {
     console.log('--- 🧠 OpenClaw Memory System Demo (Delegated AI) ---');
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    // Detect available brain (Minimax or OpenAI)
+    const apiKey = process.env.MINIMAX_API_KEY || process.env.OPENAI_API_KEY;
+    const baseUrl = process.env.MINIMAX_BASE_URL || 'https://api.minimax.chat/v1' || process.env.OPENAI_BASE_URL;
+
     if (!apiKey) {
-        console.error('ERROR: OPENAI_API_KEY not found in .env');
-        console.log('Please set OPENAI_API_KEY in your .env file.');
+        console.error('ERROR: No AI Brain found! (Please set MINIMAX_API_KEY or OPENAI_API_KEY)');
         return;
     }
 
+    console.log(`🔌 Connecting OpenClaw to Brain: ${process.env.MINIMAX_API_KEY ? 'Minimax' : 'OpenAI'}`);
+
     // 1. Initialize the AI Provider (The Host handles the API Key)
-    // The memory system no longer needs to know about API keys internally.
-    const provider = new OpenAIProvider(apiKey, process.env.OPENAI_BASE_URL);
+    const provider = new OpenAIProvider(apiKey, baseUrl);
 
     // 2. Initialize the Memory System with the provider
     const memory = new OpenClawMemory({

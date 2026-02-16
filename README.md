@@ -54,41 +54,29 @@ cd OpenClaw-Memory-System
 npm install
 ```
 
-### 2. Implement the AI Provider
-The host application manages the API keys and provides the AI logic. You can use the built-in `OpenAIProvider` for easy setup:
+### 2. Plug in your AI "Brain"
+OpenClaw is a **pure memory engine**. It doesn't need to be "installed" with API keys. You simply "hand over" your existing AI capabilities (OpenAI, Local LLM, etc.) via a provider:
 
 ```typescript
 import { OpenClawMemory, OpenAIProvider } from 'openclaw-memory';
 
-// 1. Host manages API keys
-const provider = new OpenAIProvider(process.env.OPENAI_API_KEY!);
+// 1. You manage the AI Brain (Key stays in your app)
+const myAI = new OpenAIProvider(process.env.MY_API_KEY);
 
-// 2. Initialize Memory with the provider
-const memory = new OpenClawMemory({
-  aiProvider: provider,
-  memoryDir: './memory',
-  tokenBudget: 4000,
-});
+// 2. OpenClaw provides the Memory capability
+const memory = new OpenClawMemory({ aiProvider: myAI });
 ```
 
-### 3. Usage Example
+### 3. Usage Example (Pure Knowledge Management)
+Once connected, OpenClaw handles all the complex logic of remembering and searching:
 
 ```typescript
-// Start a session (Episodic)
-memory.startSession('session-001');
-memory.addMessage('user', 'I prefer TypeScript and dark mode');
-await memory.endSession();
+// Focus on KNOWLEDGE, not API calls
+await memory.rememberFact('User prefers dark mode and TypeScript.', ['preference']);
 
-// Store specific facts (Semantic)
-await memory.rememberFact('User prefers dark mode', ['preference'], 0.8);
-
-// Recall with hybrid search
-const { context } = await memory.recall('user preferences');
+// Retrieve formatted context for your LLM
+const { context } = await memory.recall('What are the user preferences?');
 console.log(context); 
-
-// Maintenance (Run periodically)
-memory.decay();                  // Apply forgetting curve
-await memory.consolidate();      // Organize memories + Summarize
 ```
 
 ## 📖 API Reference

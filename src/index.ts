@@ -463,3 +463,5 @@ export {
 
 export { Procedure } from './memory/procedural-memory';
 export { TOKEN_PRESETS, EMBEDDING_MODELS } from './config';
+export { OpenAIProvider } from './providers/openai';
+export { MinimaxProvider } from './providers/minimax';

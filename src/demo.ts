@@ -1,22 +1,22 @@
-
 import { OpenClawMemory } from './index';
 import { OpenAIProvider } from './providers/openai';
+import { MinimaxProvider } from './providers/minimax';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Load environment variables (OPENAI_API_KEY)
+// Load environment variables
 dotenv.config();
 
 async function runDemo() {
     console.log('--- 🧠 OpenClaw Memory System Demo (Delegated AI) ---');
 
-    // Detect available brain (Minimax or OpenAI)
-    const isMinimax = !!process.env.MINIMAX_API_KEY;
-    const apiKey = process.env.MINIMAX_API_KEY || process.env.OPENAI_API_KEY;
-    const baseUrl = process.env.MINIMAX_BASE_URL || (isMinimax ? 'https://api.minimax.chat/v1' : undefined) || process.env.OPENAI_BASE_URL;
+    // Detect available brain (Minimax, Anthropic-gateway, or OpenAI)
+    const isMinimax = !!(process.env.MINIMAX_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+    const apiKey = process.env.MINIMAX_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || process.env.OPENAI_API_KEY;
+    const baseUrl = process.env.MINIMAX_BASE_URL || process.env.ANTHROPIC_BASE_URL || (isMinimax ? 'https://api.minimax.chat/v1' : undefined) || process.env.OPENAI_BASE_URL;
 
     if (!apiKey) {
-        console.error('ERROR: No AI Brain found! (Please set MINIMAX_API_KEY or OPENAI_API_KEY)');
+        console.error('ERROR: No AI Brain found! (Please set MINIMAX_API_KEY, ANTHROPIC_AUTH_TOKEN or OPENAI_API_KEY)');
         return;
     }
 
@@ -27,7 +27,17 @@ async function runDemo() {
     const embedModel = isMinimax ? (process.env.EMBEDDING_MODEL || 'embo-01') : 'text-embedding-3-small';
 
     // 1. Initialize the AI Provider (The Host handles the API Key)
-    const provider = new OpenAIProvider(apiKey, baseUrl, chatModel, embedModel);
+    let provider;
+    if (isMinimax) {
+        provider = new MinimaxProvider({
+            apiKey,
+            baseUrl,
+            chatModel,
+            embedModel
+        });
+    } else {
+        provider = new OpenAIProvider(apiKey, baseUrl, chatModel, embedModel);
+    }
 
     // 2. Initialize the Memory System with the provider
     const memory = new OpenClawMemory({

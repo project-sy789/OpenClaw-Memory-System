@@ -162,6 +162,8 @@ export interface WorkingMemoryEntry {
 export interface OpenClawMemoryConfig {
     /** OpenAI API key for embeddings */
     openaiApiKey: string;
+    /** Optional Base URL for OpenAI-compatible providers (e.g., Minimax, OpenRouter) */
+    openaiBaseUrl?: string;
     /** Directory for memory markdown files */
     memoryDir?: string;
     /** SQLite database path */

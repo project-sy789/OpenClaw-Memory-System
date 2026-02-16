@@ -237,12 +237,30 @@ src/
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENAI_API_KEY` | - | OpenAI API key (required) |
+| `OPENAI_API_KEY` | - | API key (OpenAI, Minimax, etc.) |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Custom API URL |
 | `MEMORY_DIR` | `./memory` | Memory file storage |
 | `TOKEN_BUDGET` | `4000` | Max tokens per retrieval |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model |
-| `EMBEDDING_DIMENSIONS` | `1536` | Vector dimensions |
-| `DECAY_RETENTION_RATE` | `0.95` | Daily retention (0-1) |
+
+### Example: Using with Minimax
+
+```typescript
+const memory = new OpenClawMemory({
+  openaiApiKey: 'YOUR_MINIMAX_KEY',
+  openaiBaseUrl: 'https://api.minimax.chat/v1',
+  embeddingModel: 'embo-01',
+});
+```
+
+### Example: Using with local Ollama
+
+```typescript
+const memory = new OpenClawMemory({
+  openaiApiKey: 'ollama', // arbitrary
+  openaiBaseUrl: 'http://localhost:11434/v1',
+  embeddingModel: 'nomic-embed-text',
+});
+```
 
 ## 📄 License
 

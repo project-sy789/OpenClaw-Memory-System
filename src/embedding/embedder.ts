@@ -24,9 +24,13 @@ export class EmbeddingEngine {
         apiKey: string,
         model: string,
         dimensions: number,
-        storage: SQLiteStorage
+        storage: SQLiteStorage,
+        baseUrl?: string
     ) {
-        this.client = new OpenAI({ apiKey });
+        this.client = new OpenAI({
+            apiKey,
+            baseURL: baseUrl
+        });
         this.model = model;
         this.dimensions = dimensions;
         this.storage = storage;

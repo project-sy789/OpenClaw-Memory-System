@@ -17,8 +17,11 @@ export class HeaderInjector {
     private cache = new Map<string, HeaderCache>();
     private useAI: boolean;
 
-    constructor(apiKey: string, useAI = true) {
-        this.client = new OpenAI({ apiKey });
+    constructor(apiKey: string, useAI = true, baseUrl?: string) {
+        this.client = new OpenAI({
+            apiKey,
+            baseURL: baseUrl
+        });
         this.useAI = useAI;
     }
 

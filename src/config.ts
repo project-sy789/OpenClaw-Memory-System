@@ -7,8 +7,9 @@ import { OpenClawMemoryConfig } from './types';
 /** Default configuration values */
 export const DEFAULT_CONFIG: Required<OpenClawMemoryConfig> = {
     openaiApiKey: '',
+    openaiBaseUrl: 'https://api.openai.com/v1',
     memoryDir: './memory',
-    dbPath: './memory/openclaw-memory.db',
+    dbPath: undefined as any, // handled belowry.db',
     tokenBudget: 4000,
     embeddingModel: 'text-embedding-3-small',
     embeddingDimensions: 1536,

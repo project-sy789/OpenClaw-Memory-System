@@ -91,7 +91,8 @@ export class OpenClawMemory {
             this.config.openaiApiKey,
             this.config.embeddingModel,
             this.config.embeddingDimensions,
-            this.storage
+            this.storage,
+            this.config.openaiBaseUrl
         );
 
         // Initialize chunking
@@ -99,7 +100,11 @@ export class OpenClawMemory {
             minChunkSize: this.config.chunkSizeMin,
             maxChunkSize: this.config.chunkSizeMax,
         });
-        this.headerInjector = new HeaderInjector(this.config.openaiApiKey);
+        this.headerInjector = new HeaderInjector(
+            this.config.openaiApiKey,
+            true,
+            this.config.openaiBaseUrl
+        );
         this.merger = new AutoMerger(
             this.markdown,
             this.embedder,

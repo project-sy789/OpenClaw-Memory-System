@@ -100,17 +100,24 @@ export class SQLiteStorage {
         created_at TEXT NOT NULL
       );
 
-      -- Semantic cache for queries
-      CREATE TABLE IF NOT EXISTS semantic_cache (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        query_hash TEXT NOT NULL UNIQUE,
-        query_embedding BLOB NOT NULL,
-        result_chunk_ids TEXT NOT NULL,
-        result_scores TEXT NOT NULL,
-        hit_count INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        last_hit_at TEXT
-      );
+        -- Semantic cache for queries
+        CREATE TABLE IF NOT EXISTS semantic_cache (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          query_hash TEXT NOT NULL UNIQUE,
+          query_embedding BLOB NOT NULL,
+          result_chunk_ids TEXT NOT NULL,
+          result_scores TEXT NOT NULL,
+          hit_count INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          last_hit_at TEXT
+        );
+
+        -- Persistent system configuration
+        CREATE TABLE IF NOT EXISTS system_config (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
 
       -- Indexes for performance
       CREATE INDEX IF NOT EXISTS idx_chunks_tier ON memory_chunks(tier);
@@ -763,6 +770,51 @@ export class SQLiteStorage {
             .prepare('DELETE FROM memory_chunks WHERE decay_score < ?')
             .run(threshold);
         return result.changes;
+    }
+
+    // ----------------------------------------------------------
+    // System Configuration
+    // ----------------------------------------------------------
+
+    /** Set a system configuration value */
+    setSystemConfig(key: string, value: any): void {
+        const now = new Date().toISOString();
+        const jsonValue = JSON.stringify(value);
+        this.db
+            .prepare(
+                'INSERT OR REPLACE INTO system_config (key, value, updated_at) VALUES (?, ?, ?)'
+            )
+            .run(key, jsonValue, now);
+    }
+
+    /** Get a system configuration value */
+    getSystemConfig<T>(key: string): T | null {
+        const row = this.db
+            .prepare('SELECT value FROM system_config WHERE key = ?')
+            .get(key) as { value: string } | undefined;
+        if (!row) return null;
+        try {
+            return JSON.parse(row.value) as T;
+        } catch {
+            return null;
+        }
+    }
+
+    /** Get all system configuration values */
+    getAllSystemConfig(): Record<string, any> {
+        const rows = this.db.prepare('SELECT key, value FROM system_config').all() as {
+            key: string;
+            value: string;
+        }[];
+        const config: Record<string, any> = {};
+        for (const row of rows) {
+            try {
+                config[row.key] = JSON.parse(row.value);
+            } catch {
+                // Ignore malformed values
+            }
+        }
+        return config;
     }
 
     close(): void {

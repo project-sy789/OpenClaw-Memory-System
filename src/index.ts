@@ -86,6 +86,16 @@ export class OpenClawMemory {
         this.storage = new SQLiteStorage(this.config.dbPath);
         this.markdown = new MarkdownManager(this.config.memoryDir);
 
+        // --- Load Persistent Config ---
+        const persistedConfig = this.storage.getAllSystemConfig();
+        if (Object.keys(persistedConfig).length > 0) {
+            logger.info('Loading persisted configuration from database...');
+            // Merge peristed config over initial config, then re-resolve to handle fallbacks
+            this.config = resolveConfig({ ...this.config, ...persistedConfig });
+            // Re-apply log level in case it changed in DB
+            setLogLevel(this.config.logLevel);
+        }
+
         // Initialize embedding engine
         this.embedder = new EmbeddingEngine(
             this.config.openaiApiKey,
@@ -459,6 +469,11 @@ export class OpenClawMemory {
 
         // 1. Merge Config
         this.config = { ...this.config, ...newConfig } as Required<OpenClawMemoryConfig>;
+
+        // --- Persist to Database ---
+        for (const [key, value] of Object.entries(newConfig)) {
+            this.storage.setSystemConfig(key, value);
+        }
 
         // 2. Update Log Level
         if (newConfig.logLevel) {

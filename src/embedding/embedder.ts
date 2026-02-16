@@ -62,8 +62,12 @@ export class EmbeddingEngine {
 
                 if (i === this.maxRetries) break;
 
-                const delay = this.retryDelay * Math.pow(2, i);
-                logger.warn(`API Error ${status}. Retrying in ${delay}ms (attempt ${i + 1}/${this.maxRetries})...`);
+                // Exponential backoff + jitter (±20%)
+                const baseDelay = this.retryDelay * Math.pow(2, i);
+                const jitter = baseDelay * 0.2 * (Math.random() - 0.5);
+                const delay = Math.max(0, baseDelay + jitter);
+
+                logger.warn(`API Error ${status}. Retrying in ${Math.round(delay)}ms (attempt ${i + 1}/${this.maxRetries})...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }

@@ -8,8 +8,8 @@ import { OpenClawMemoryConfig } from './types';
 export const DEFAULT_CONFIG: Omit<Required<OpenClawMemoryConfig>, 'aiProvider'> = {
     memoryDir: './memory',
     dbPath: undefined as any, // handled below
-    maxRetries: 3,
-    retryDelay: 1000,
+    maxRetries: 5,
+    retryDelay: 2000,
     batchSize: 50,
     tokenBudget: 4000,
     embeddingModel: 'text-embedding-3-small',

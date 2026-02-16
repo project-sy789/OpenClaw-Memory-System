@@ -161,7 +161,7 @@ export class EmbeddingEngine {
             const batch = needsGeneration.slice(i, i + batchSize);
             const texts = batch.map((b) => b.content);
 
-            const embeddings = await this.provider.embed(texts);
+            const embeddings = await this.withRetry(() => this.provider.embed(texts));
 
             for (let j = 0; j < batch.length; j++) {
                 const { chunkId, content } = batch[j];
@@ -201,7 +201,7 @@ export class EmbeddingEngine {
         // Truncate if too long (optional safety measure)
         const truncated = text.slice(0, 30000);
 
-        const results = await this.provider.embed([truncated]);
+        const results = await this.withRetry(() => this.provider.embed([truncated]));
 
         if (!results || results.length === 0) {
             throw new Error('AI Provider failed to generate embedding');

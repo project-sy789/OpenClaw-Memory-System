@@ -58,7 +58,9 @@ export class MinimaxProvider implements AIProvider {
             const data: any = await response.json();
 
             if (data.base_resp && data.base_resp.status_code !== 0) {
-                throw new Error(`Minimax API Error (${data.base_resp.status_code}): ${data.base_resp.status_msg}`);
+                const error: any = new Error(`Minimax API Error (${data.base_resp.status_code}): ${data.base_resp.status_msg}`);
+                if (data.base_resp.status_code === 1002) error.status = 429;
+                throw error;
             }
 
             // Minimax returns 'vectors' or 'data[].embedding' depending on endpoint
@@ -101,7 +103,9 @@ export class MinimaxProvider implements AIProvider {
             const data: any = await response.json();
 
             if (data.base_resp && data.base_resp.status_code !== 0) {
-                throw new Error(`Minimax API Error (${data.base_resp.status_code}): ${data.base_resp.status_msg}`);
+                const error: any = new Error(`Minimax API Error (${data.base_resp.status_code}): ${data.base_resp.status_msg}`);
+                if (data.base_resp.status_code === 1002) error.status = 429;
+                throw error;
             }
 
             return data.choices?.[0]?.message?.content || '';

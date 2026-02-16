@@ -51,12 +51,16 @@ cd OpenClaw-Memory-System
 npm install
 ```
 
-### 2. Configure
+### 2. Configure (Interactive)
+The easiest way to configure OpenClaw is to run the setup wizard:
 
 ```bash
-cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+npm run setup
 ```
+
+This will guide you through selecting an AI provider (OpenAI, Minimax, etc.) and automatically create your `.env` file.
+
+Alternatively, you can manually copy `.env.example` to `.env` and edit it.
 
 ### 3. Use as Library
 

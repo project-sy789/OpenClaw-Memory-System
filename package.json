@@ -23,6 +23,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo": "tsx src/demo.ts",
+    "setup": "ts-node scripts/setup.ts",
     "lint": "eslint src/"
   },
   "keywords": [
@@ -43,15 +44,17 @@
   "license": "MIT",
   "dependencies": {
     "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
     "openai": "^4.77.0",
     "tiktoken": "^1.0.18",
-    "uuid": "^11.0.5",
-    "dotenv": "^16.4.7"
+    "uuid": "^11.0.5"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
+    "@types/prompts": "^2.4.9",
     "@types/uuid": "^10.0.0",
+    "prompts": "^2.4.2",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"

@@ -1,0 +1,62 @@
+{
+  "name": "openclaw-memory",
+  "version": "1.0.0",
+  "description": "Advanced tiered memory system for AI agents — long-term memory with vector search, semantic chunking, and token-efficient retrieval",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    ".env.example"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo": "tsx src/demo.ts",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "ai",
+    "memory",
+    "vector",
+    "embedding",
+    "rag",
+    "agent",
+    "long-term-memory",
+    "semantic-search"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/project-sy789/OpenClaw-Memory-System.git"
+  },
+  "author": "OpenClaw",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "openai": "^4.77.0",
+    "tiktoken": "^1.0.18",
+    "uuid": "^11.0.5",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 OpenClaw Memory System</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 30px; }
+        h1 span { font-size: 48px; }
+        
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .card h2 { margin-bottom: 16px; color: #7dd3fc; }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #7dd3fc;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        button:hover { transform: scale(1.02); }
+        button.secondary { background: rgba(255,255,255,0.2); color: #fff; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+        
+        .stat-item {
+            background: rgba(0,0,0,0.3);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .stat-value { font-size: 32px; font-weight: bold; color: #7dd3fc; }
+        .stat-label { font-size: 14px; opacity: 0.7; }
+        
+        pre {
+            background: rgba(0,0,0,0.4);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+        
+        .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+        .tab {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .tab.active { background: #7dd3fc; color: #000; }
+        
+        #response { margin-top: 16px; }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><span>🧠</span><br>OpenClaw Memory</h1>
+        
+        <!-- Stats -->
+        <div class="card">
+            <h2>📊 Statistics</h2>
+            <div class="stats-grid" id="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="totalChunks">-</div>
+                    <div class="stat-label">Total Memories</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="totalEpisodes">-</div>
+                    <div class="stat-label">Sessions</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="cacheHit">-</div>
+                    <div class="stat-label">Cache Hit %</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="card">
+            <h2>💾 Actions</h2>
+            <div class="tabs">
+                <div class="tab active" data-tab="remember">Remember</div>
+                <div class="tab" data-tab="recall">Recall</div>
+                <div class="tab" data-tab="session">Session</div>
+            </div>
+            
+            <!-- Remember Tab -->
+            <div id="tab-remember">
+                <input type="text" id="factContent" placeholder="Enter fact to remember..." />
+                <input type="text" id="factTags" placeholder="Tags (comma separated): preference, food" />
+                <button onclick="remember()">Save Fact</button>
+            </div>
+            
+            <!-- Recall Tab -->
+            <div id="tab-recall" style="display:none">
+                <input type="text" id="searchQuery" placeholder="Search memories..." />
+                <button onclick="recall()">Search</button>
+            </div>
+            
+            <!-- Session Tab -->
+            <div id="tab-session" style="display:none">
+                <input type="text" id="sessionId" placeholder="Session ID (optional)" />
+                <button onclick="startSession()" class="secondary">Start Session</button>
+                <button onclick="endSession()" class="secondary">End Session</button>
+                <div style="margin-top: 12px">
+                    <input type="text" id="msgRole" placeholder="Role: user or assistant" value="user" />
+                    <textarea id="msgContent" placeholder="Message content..." rows="2"></textarea>
+                    <button onclick="sendMessage()" class="secondary">Send Message</button>
+                </div>
+            </div>
+            
+            <div id="response"></div>
+        </div>
+        
+        <!-- Health -->
+        <div class="card">
+            <h2>🏥 System Health</h2>
+            <div id="health">Loading...</div>
+        </div>
+    </div>
+    
+    <script>
+        const API = window.location.origin;
+        let currentSessionId = null;
+        
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('[id^="tab-"]').forEach(d => d.style.display = 'none');
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).style.display = 'block';
+            });
+        });
+        
+        // Show response
+        function show(msg, isError = false) {
+            document.getElementById('response').innerHTML = 
+                `<pre class="${isError ? 'error' : 'success'}">${msg}</pre>`;
+        }
+        
+        // Load stats
+        async function loadStats() {
+            try {
+                const res = await fetch(`${API}/stats`);
+                const data = await res.json();
+                document.getElementById('totalChunks').textContent = data.totalChunks || 0;
+                document.getElementById('totalEpisodes').textContent = data.totalEpisodes || 0;
+                document.getElementById('cacheHit').textContent = 
+                    Math.round((data.cacheHitRate || 0) * 100) + '%';
+            } catch (e) {
+                document.getElementById('stats').innerHTML = '<p style="color:#f87171">API not running. Start with: docker-compose up -d api</p>';
+            }
+        }
+        
+        // Load health
+        async function loadHealth() {
+            try {
+                const res = await fetch(`${API}/health`);
+                const data = await res.json();
+                document.getElementById('health').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (e) {
+                document.getElementById('health').innerHTML = '<p style="color:#f87171">API not running</p>';
+            }
+        }
+        
+        // Remember fact
+        async function remember() {
+            const content = document.getElementById('factContent').value;
+            const tagsStr = document.getElementById('factTags').value;
+            const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()) : [];
+            
+            if (!content) return show('Please enter content', true);
+            
+            const res = await fetch(`${API}/facts`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ content, tags })
+            });
+            
+            if (res.ok) {
+                show('✅ Fact saved!');
+                document.getElementById('factContent').value = '';
+                loadStats();
+            } else {
+                show('Error: ' + await res.text(), true);
+            }
+        }
+        
+        // Recall
+        async function recall() {
+            const query = document.getElementById('searchQuery').value;
+            if (!query) return show('Please enter query', true);
+            
+            show('Searching...');
+            const res = await fetch(`${API}/recall?q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            
+            if (res.ok) {
+                show(data.context || 'No results found');
+            } else {
+                show('Error: ' + data.error, true);
+            }
+        }
+        
+        // Session
+        async function startSession() {
+            const sessionId = document.getElementById('sessionId').value || undefined;
+            const res = await fetch(`${API}/sessions`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ sessionId })
+            });
+            
+            if (res.ok) {
+                currentSessionId = sessionId || 'session-' + Date.now();
+                show('✅ Session started: ' + currentSessionId);
+            } else {
+                show('Error', true);
+            }
+        }
+        
+        async function endSession() {
+            if (!currentSessionId) return show('No active session', true);
+            
+            const res = await fetch(`${API}/sessions/${currentSessionId}/end`, {
+                method: 'POST'
+            });
+            
+            if (res.ok) {
+                show('✅ Session ended');
+                currentSessionId = null;
+                loadStats();
+            }
+        }
+        
+        async function sendMessage() {
+            if (!currentSessionId) return show('Start a session first', true);
+            
+            const role = document.getElementById('msgRole').value;
+            const content = document.getElementById('msgContent').value;
+            
+            const res = await fetch(`${API}/sessions/${currentSessionId}/messages`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ role, content })
+            });
+            
+            if (res.ok) {
+                show('✅ Message sent');
+                document.getElementById('msgContent').value = '';
+            }
+        }
+        
+        // Init
+        loadStats();
+        loadHealth();
+        setInterval(loadStats, 10000);
+    </script>
+</body>
+</html>

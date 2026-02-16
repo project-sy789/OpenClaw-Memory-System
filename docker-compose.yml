@@ -15,6 +15,10 @@ version: '3.8'
 #   docker-compose exec memory recall "what does boss like"
 #   docker-compose exec memory interactive
 #
+# 🌐 API Server:
+#   docker-compose up -d api
+#   curl http://localhost:3000/stats
+#
 # 📝 Logs:
 #   docker-compose logs -f
 #
@@ -23,6 +27,7 @@ version: '3.8'
 # ========================================================
 
 services:
+  # CLI mode (default)
   memory:
     build: .
     container_name: openclaw-memory
@@ -32,5 +37,18 @@ services:
     env_file:
       - .env
     restart: unless-stopped
-    # ports:
-    #   - "3000:3000"  # Uncomment for API server
+    command: ["stats"]
+
+  # REST API Server
+  api:
+    build: .
+    container_name: openclaw-memory-api
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./memory:/app/memory
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    restart: unless-stopped
+    command: ["node", "dist/server.js"]

@@ -1,62 +1,48 @@
 
 import { OpenClawMemory } from '../index';
-import * as dotenv from 'dotenv';
-import * as path from 'path';
-
-// Load env
-dotenv.config({ path: path.join(process.cwd(), '.env') });
+import { MockAIProvider } from './mock-provider';
+import { logger } from '../utils/logger';
 
 async function main() {
-    console.log('🔄 Testing Dynamic Config Update...\n');
+    console.log('🔄 Testing Dynamic Config Update (Delegated AI Architecture)...\n');
 
-    // 1. Start with invalid config
-    console.log('1. Initializing with DUMMY key...');
+    // 1. Initialize with Mock Provider
+    console.log('1. Initializing memory system...');
     const memory = new OpenClawMemory({
-        openaiApiKey: 'sk-dummy-key-12345',
-        logLevel: 'error' // suppress errors for now
+        aiProvider: new MockAIProvider(),
+        logLevel: 'error',
+        tokenBudget: 4000
     });
 
-    // 2. Check health (Expect Failure)
-    console.log('   Checking health (should fail)...');
-    const health1 = await memory.health();
-    if (health1.status === 'ok') {
-        console.error('❌ Failed: Expected error but got OK');
+    // 2. Check initial state
+    const initialConfig = (memory as any).config;
+    console.log(`   Initial TokenBudget: ${initialConfig.tokenBudget}`);
+
+    // 3. Update to New Config (Non-AI fields)
+    console.log('\n2. Updating configuration (tokenBudget: 8000)...');
+    await memory.updateConfig({
+        tokenBudget: 8000,
+        logLevel: 'info'
+    });
+
+    // 4. Verify update
+    const updatedConfig = (memory as any).config;
+    console.log(`   Updated TokenBudget: ${updatedConfig.tokenBudget}`);
+
+    if (updatedConfig.tokenBudget === 8000) {
+        console.log('\n✅ Success! Configuration updated dynamically.');
     } else {
-        console.log('✅ Correctly failed with invalid key.');
+        console.error('\n❌ Failed: Configuration was not updated.');
+        process.exit(1);
     }
 
-    // 3. Update to Valid Config
-    console.log('\n2. Hot-Swapping to VALID key from .env...');
-
-    // Get real key from env or use a fallback if not present for test
-    const realKey = process.env.OPENAI_API_KEY;
-    if (!realKey || realKey === 'unused') {
-        const kimiKey = process.env.LLM_API_KEY;
-        const miniKey = process.env.EMBEDDING_API_KEY;
-
-        if (kimiKey && miniKey) {
-            await memory.updateConfig({
-                llmProvider: { apiKey: kimiKey, baseUrl: process.env.LLM_BASE_URL, model: process.env.LLM_MODEL },
-                embeddingProvider: { apiKey: miniKey, baseUrl: process.env.EMBEDDING_BASE_URL, model: process.env.EMBEDDING_MODEL }
-            });
-        } else {
-            console.log('⚠️ No valid keys found in .env to test with. Skipping actual update.');
-            return;
-        }
+    // 5. Check health
+    console.log('\n3. Verifying system health after update...');
+    const health = await memory.health();
+    if (health.status === 'ok') {
+        console.log('✅ System is healthy.');
     } else {
-        await memory.updateConfig({
-            openaiApiKey: realKey
-        });
-    }
-
-    // 4. Check health again (Expect Success)
-    console.log('   Checking health again (should succeed)...');
-    const health2 = await memory.health();
-    if (health2.status === 'ok') {
-        console.log('✅ Success! Host-swap worked. System is healthy.');
-        console.log(`   Latency: Embed=${health2.components.embeddingProvider.latency}ms, LLM=${health2.components.llmProvider.latency}ms`);
-    } else {
-        console.error('❌ Failed: Still unhealthy after update.', health2);
+        console.error('❌ System is unhealthy.', health);
     }
 
     memory.close();

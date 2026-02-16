@@ -12,37 +12,15 @@
 
 | Feature | Description |
 |---------|-------------|
-| **Brain-Delegate** | **New!** Fully decoupled from API keys. Host provides the AI capabilities. |
 | **5-Tier Memory** | Working → Episodic → Semantic → Procedural → Meta |
 | **Smart Chunking** | 3-phase semantic chunking (structural → boundary → hierarchy) |
-| **Auto Headers** | AI-generated semantic headers for better embedding quality |
 | **Hybrid Search** | Vector + BM25 keyword + Knowledge Graph with RRF fusion |
 | **Token Budget** | Automatic context control with progressive detail levels |
 | **Memory Decay** | Ebbinghaus forgetting curve with spaced repetition |
 | **Auto-Consolidation** | Merge similar memories + summarize old episodes |
-| **Embedding Cache** | 2-level cache (hot in-memory + persistent SQLite) |
 | **Thai Support** | Full Thai language support in tokenization and fact extraction |
-| **Persistent Config** | Non-sensitive settings (budget, logs) stored in SQLite (Docker-friendly) |
 
-## 🏗 Architecture (Delegated AI)
-
-OpenClaw Memory acts as a **Pure Memory Hub**. It does not own API keys; instead, it delegates all AI tasks (embeddings, chat completions) to the host application via a standardized `AIProvider` interface.
-
-```
-┌─────────────────────────────────────────────────────┐
-│                  OpenClawMemory API                  │
-├───────────┬───────────┬────────────┬────────────────┤
-│  Working  │ Episodic  │  Semantic  │  Procedural    │
-│  Memory   │  Memory   │  Memory   │  Memory        │
-├───────────┴───────────┴────────────┴────────────────┤
-│              Hybrid Search Engine                    │
-│         Vector + BM25 + Knowledge Graph              │
-├─────────────────────────────────────────────────────┤
-│      AIProvider Interface (Delegated to Host)       │
-├─────────────────────────────────────────────────────┤
-│  SQLite + FTS5  │ AI (Embed/Chat)  │  Markdown      │
-└─────────────────────────────────────────────────────┘
-```
+---
 
 ## 🚀 Quick Start
 
@@ -54,80 +32,129 @@ cd OpenClaw-Memory-System
 npm install
 ```
 
-### 2. Plug in your AI "Brain"
-OpenClaw is a **pure memory engine**. It doesn't need to be "installed" with API keys. You simply "hand over" your existing AI capabilities (OpenAI, Local LLM, etc.) via a provider:
+### 2. Configure
+
+Copy `.env.example` to `.env` and add your API keys:
+
+```bash
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+**Supported Providers:**
+- **Minimax** (recommended for Thai): Set `MINIMAX_API_KEY`
+- **OpenAI**: Set `OPENAI_API_KEY`
+
+### 3. Run Tests
+
+```bash
+# With mock provider (no API needed)
+npm run test:mock
+
+# With real API
+npm test
+```
+
+---
+
+## 💻 CLI Usage
+
+```bash
+# Show help
+npm run cli
+
+# Remember a fact
+npm run cli -- remember "Boss likes coffee" preference food
+
+# Search memories
+npm run cli -- recall "what does boss like"
+
+# Show statistics
+npm run cli -- stats
+
+# Health check
+npm run cli -- health
+
+# Interactive mode
+npm run cli -- interactive
+```
+
+---
+
+## 🔧 Programmatic Usage
 
 ```typescript
-import { OpenClawMemory, OpenAIProvider } from 'openclaw-memory';
+import { OpenClawMemory } from './src/index.js';
+import { MinimaxProvider } from './src/providers/minimax.js';
 
-// 1. You manage the AI Brain (Key stays in your app)
-const myAI = new OpenAIProvider(process.env.MY_API_KEY);
+// Create provider
+const provider = new MinimaxProvider({
+    apiKey: process.env.MINIMAX_API_KEY,
+    baseUrl: 'https://api.minimaxi.chat/v1',
+    embedModel: 'embo-01',
+});
 
-// 2. OpenClaw provides the Memory capability
-const memory = new OpenClawMemory({ aiProvider: myAI });
+// Create memory instance
+const memory = new OpenClawMemory({
+    aiProvider: provider,
+    memoryDir: './memory',
+    tokenBudget: 4000,
+});
+
+// Store a fact
+await memory.rememberFact('Boss likes Thai food', ['preference', 'food']);
+
+// Start session
+memory.startSession('session-1');
+memory.addMessage('user', 'Hello!');
+memory.addMessage('assistant', 'Hi there!');
+await memory.endSession();
+
+// Search
+const result = await memory.recall('what does boss like?');
+console.log(result.context);
+
+// Stats
+console.log(memory.stats());
+
+// Health
+console.log(await memory.health());
 ```
 
-### 3. Usage Example (Pure Knowledge Management)
-Once connected, OpenClaw handles all the complex logic of remembering and searching:
+---
 
-```typescript
-// Focus on KNOWLEDGE, not API calls
-await memory.rememberFact('User prefers dark mode and TypeScript.', ['preference']);
+## 🐳 Docker
 
-// Retrieve formatted context for your LLM
-const { context } = await memory.recall('What are the user preferences?');
-console.log(context); 
+```bash
+# Build
+docker build -t openclaw-memory .
+
+# Run with docker-compose
+docker-compose up -d
 ```
 
-## 📖 API Reference
+---
 
-### Session Management
+## 📁 Project Structure
 
-| Method | Description |
-|--------|-------------|
-| `startSession(id)` | Start a new conversation session |
-| `addMessage(role, content)` | Add message to working memory |
-| `endSession()` | Flush working memory → episodic memory |
-
-### Memory Interaction
-
-| Method | Description |
-|--------|-------------|
-| `rememberFact(fact, tags, importance)` | Store a single fact |
-| `recall(query, options)` | Hybrid search with token budget |
-| `recallContext(query, maxTokens)` | Quick recall → formatted string |
-| `health()` | Check system status (DB + AI Provider) |
-| `updateConfig(config)` | Update and persist settings (Budget, LogLevel, etc.) |
-
-### `AIProvider` Interface
-Implement this to use any AI model (Local or API):
-```typescript
-interface AIProvider {
-  embed(texts: string[]): Promise<number[][]>;
-  chat(messages: any[], options?: any): Promise<string>;
-  checkHealth(): Promise<{ status: 'ok' | 'error'; latency?: number }>;
-}
+```
+OpenClaw-Memory-System/
+├── src/
+│   ├── memory/          # 5-tier memory implementations
+│   ├── storage/         # SQLite storage layer
+│   ├── retrieval/      # Hybrid search engine
+│   ├── embedding/       # Embedding utilities
+│   ├── providers/       # AI providers (Minimax, OpenAI)
+│   └── index.ts        # Main API
+├── test/               # Unit tests
+├── memory/             # SQLite database (created at runtime)
+├── cli.ts              # CLI interface
+├── Dockerfile          # Docker image
+└── docker-compose.yml  # Docker compose
 ```
 
-## 🧪 How It Works
-
-### Memory Flow
-```
-User Message → Working Memory (buffer)
-     ↓ (session end)
-Episodic Memory (conversation log)
-     ↓ (consolidation)
-Semantic Memory (vector-indexed facts)
-```
-
-### Hybrid Search
-Queries are processed through **Vector Similarity**, **BM25 Keyword Matching**, and **Knowledge Graph Navigation**, with results merged using **Reciprocal Rank Fusion (RRF)** to ensure the most relevant context is retrieved first.
-
-## 💰 Cost Analysis (Approx.)
-The system is highly optimized. Using `text-embedding-3-small`:
-- 1,000 chunks: ~$0.01
-- 10,000 chunks: ~$0.10
-- *Note: Persistence and caching ensure you never pay for the same embedding twice.*
+---
 
 ## 📄 License
+
 MIT © OpenClaw

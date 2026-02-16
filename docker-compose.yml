@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  memory-system:
+    build: .
+    container_name: openclaw-memory
+    volumes:
+      - ./memory:/app/memory
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - openclaw-network
+
+  # Optional: REST API server (if needed)
+  # memory-api:
+  #   build: .
+  #   container_name: openclaw-memory-api
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ./memory:/app/memory
+  #   restart: unless-stopped
+  #   networks:
+  #     - openclaw-network
+
+networks:
+  openclaw-network:
+    driver: bridge

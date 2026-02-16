@@ -4,6 +4,9 @@
   "description": "Advanced tiered memory system for AI agents — long-term memory with vector search, semantic chunking, and token-efficient retrieval",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "memory": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -18,11 +21,13 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build",
+    "build:cli": "tsc cli.ts --outDir dist --esModuleInterop --module NodeNext --moduleResolution NodeNext",
+    "prepare": "echo 'skip prepare'",
     "dev": "tsx watch src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "demo": "tsx src/demo.ts",
+    "cli": "tsx cli.ts",
     "setup": "tsx scripts/setup.ts",
     "health": "tsx src/scripts/health-check.ts",
     "update": "git pull && npm install && npm run build",
@@ -52,13 +57,13 @@
     "uuid": "^11.0.5"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.0",
     "@types/prompts": "^2.4.9",
     "@types/uuid": "^10.0.0",
     "prompts": "^2.4.2",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0",
+    "typescript": "^5.9.3",
     "vitest": "^2.1.0"
   },
   "engines": {

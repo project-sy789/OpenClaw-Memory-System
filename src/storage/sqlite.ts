@@ -20,7 +20,7 @@ import { estimateTokens } from '../utils/tokenizer';
 import { logger } from '../utils/logger';
 
 export class SQLiteStorage {
-    private db: Database.Database;
+    private db: any;
 
     constructor(dbPath: string) {
         this.db = new Database(dbPath);

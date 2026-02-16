@@ -17,6 +17,7 @@ import { dirname, join } from 'path';
 import { OpenClawMemory } from './src/index.js';
 import { MinimaxProvider } from './src/providers/minimax.js';
 import { OpenAIProvider } from './src/providers/openai.js';
+import { FastMockProvider } from './src/providers/fast-mock.js';
 import * as dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
 
@@ -54,51 +55,51 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Create AI Provider
 const createProvider = () => {
-    if (process.env.MINIMAX_API_KEY) {
-        return new MinimaxProvider({
-            apiKey: process.env.MINIMAX_API_KEY,
-            baseUrl: process.env.MINIMAX_BASE_URL || 'https://api.minimaxi.chat/v1',
-            embedModel: process.env.EMBEDDING_MODEL || 'embo-01',
-        });
+    // Check if we should use mock (FORCE_MOCK=true in env)
+    if (process.env.FORCE_MOCK === 'true') {
+        console.log('⚠️  FORCE_MOCK enabled - using fast mock provider');
+        return new FastMockProvider(1024);
     }
-    if (process.env.OPENAI_API_KEY) {
-        return new OpenAIProvider({
-            apiKey: process.env.OPENAI_API_KEY,
-            model: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
-        });
+    
+    // Try Minimax first
+    if (process.env.MINIMAX_API_KEY && process.env.MINIMAX_API_KEY.length > 10) {
+        try {
+            return new MinimaxProvider({
+                apiKey: process.env.MINIMAX_API_KEY,
+                baseUrl: process.env.MINIMAX_BASE_URL || 'https://api.minimaxi.chat/v1',
+                embedModel: process.env.EMBEDDING_MODEL || 'embo-01',
+            });
+        } catch (e) {
+            console.log('⚠️  Minimax failed, falling back to mock');
+        }
     }
-    // Return null if no provider - will use mock in memory
-    return null;
+    
+    // Try OpenAI
+    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 10) {
+        try {
+            return new OpenAIProvider({
+                apiKey: process.env.OPENAI_API_KEY,
+                model: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
+            });
+        } catch (e) {
+            console.log('⚠️  OpenAI failed, falling back to mock');
+        }
+    }
+    
+    // Default to fast mock
+    console.log('⚠️  No valid API key - using fast mock provider (testing mode)');
+    return new FastMockProvider(1024);
 };
 
 // Memory instance
 let memory: OpenClawMemory;
-let mockProvider: any = null;
 
 const getMemory = () => {
     if (!memory) {
         const provider = createProvider();
         
-        // If no provider, create a simple mock for testing
-        if (!provider) {
-            console.log('⚠️  No API key found - using mock provider (for testing only)');
-            mockProvider = {
-                async embed(texts: string[]) {
-                    return texts.map(() => {
-                        const embedding = [];
-                        for (let i = 0; i < 1024; i++) {
-                            embedding.push(Math.random() * 2 - 1);
-                        }
-                        return embedding;
-                    });
-                },
-                async chat() { return 'Mock response'; },
-                async checkHealth() { return { status: 'ok' as const, latency: 1 }; }
-            };
-        }
-        
         memory = new OpenClawMemory({
-            aiProvider: provider || mockProvider,
+            aiProvider: provider,
             memoryDir: process.env.MEMORY_DIR || './memory',
             tokenBudget: parseInt(process.env.TOKEN_BUDGET || '4000'),
             embeddingModel: process.env.EMBEDDING_MODEL || 'embo-01',

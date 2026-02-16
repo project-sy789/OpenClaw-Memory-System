@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Build outputs
+dist
+*.tsbuildinfo
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Logs
+logs
+*.log
+
+# Memory DB (keep directory but not files)
+memory/*
+!memory/.gitkeep
+
+# Test
+test
+coverage
+
+# Misc
+*.md
+!README.md
+.env
+.env.local

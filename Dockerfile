@@ -1,22 +1,30 @@
-# OpenClaw Memory System Dockerfile
-
 FROM node:18-alpine
+
+# Install build dependencies for better-sqlite3
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-# Install dependencies
+# Copy package files
 COPY package*.json ./
-RUN npm install
+
+# Install dependencies
+RUN npm install --production
 
 # Copy source
 COPY . .
-RUN npm run build || echo "Build skipped (using tsx)"
 
-# Create memory directory
-RUN mkdir -p /app/memory
+# Build TypeScript
+RUN npm run build
 
-# Expose port (for future API server)
+# Create directories
+RUN mkdir -p /app/memory /app/logs
+
+# Set entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 EXPOSE 3000
 
-# Default command
-CMD ["node", "dist/index.js"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["stats"]

@@ -1,31 +1,36 @@
 version: '3.8'
 
+# ========================================================
+# OpenClaw Memory System
+# ========================================================
+# 
+# 🚀 Quick Start:
+#   1. cp .env.example .env
+#   2. แก้ .env ใส่ API Key (ข้ามได้ถ้าทดสอบ)
+#   3. docker-compose up -d
+#
+# 📖 CLI:
+#   docker-compose exec memory stats
+#   docker-compose exec memory remember "Boss loves coffee" preference
+#   docker-compose exec memory recall "what does boss like"
+#   docker-compose exec memory interactive
+#
+# 📝 Logs:
+#   docker-compose logs -f
+#
+# 🛑 Stop:
+#   docker-compose down
+# ========================================================
+
 services:
-  memory-system:
+  memory:
     build: .
     container_name: openclaw-memory
     volumes:
       - ./memory:/app/memory
+      - ./logs:/app/logs
     env_file:
       - .env
     restart: unless-stopped
-    networks:
-      - openclaw-network
-
-  # Optional: REST API server (if needed)
-  # memory-api:
-  #   build: .
-  #   container_name: openclaw-memory-api
-  #   ports:
-  #     - "3000:3000"
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ./memory:/app/memory
-  #   restart: unless-stopped
-  #   networks:
-  #     - openclaw-network
-
-networks:
-  openclaw-network:
-    driver: bridge
+    # ports:
+    #   - "3000:3000"  # Uncomment for API server

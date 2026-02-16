@@ -191,6 +191,21 @@ export interface OpenClawMemoryConfig {
     retryDelay?: number;
     /** Max items per embedding batch (default: 50) */
     batchSize?: number;
+
+    // --- Dual Provider Support ---
+    /** LLM Provider (for text generation/reasoning) */
+    llmProvider?: {
+        apiKey: string;
+        baseUrl?: string;
+        model?: string;
+    };
+    /** Embedding Provider (for vector generation) */
+    embeddingProvider?: {
+        apiKey: string;
+        baseUrl?: string;
+        model?: string;
+        dimensions?: number;
+    };
 }
 
 /** Merge result from auto-merger */

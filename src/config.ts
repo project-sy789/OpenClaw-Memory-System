@@ -13,6 +13,8 @@ export const DEFAULT_CONFIG: Required<OpenClawMemoryConfig> = {
     maxRetries: 3,
     retryDelay: 1000,
     batchSize: 50,
+    llmProvider: undefined as any,
+    embeddingProvider: undefined as any,
     tokenBudget: 4000,
     embeddingModel: 'text-embedding-3-small',
     embeddingDimensions: 1536,
@@ -28,7 +30,7 @@ export const DEFAULT_CONFIG: Required<OpenClawMemoryConfig> = {
 export function resolveConfig(
     userConfig: OpenClawMemoryConfig
 ): Required<OpenClawMemoryConfig> {
-    return {
+    const config = {
         ...DEFAULT_CONFIG,
         ...userConfig,
         // Derive dbPath from memoryDir if not explicitly set
@@ -36,6 +38,25 @@ export function resolveConfig(
             userConfig.dbPath ??
             `${userConfig.memoryDir ?? DEFAULT_CONFIG.memoryDir}/openclaw-memory.db`,
     };
+
+    // Backwards compatibility: Map legacy fields to new provider structure if missing
+    if (!config.llmProvider) {
+        config.llmProvider = {
+            apiKey: config.openaiApiKey,
+            baseUrl: config.openaiBaseUrl,
+            model: 'gpt-4o-mini', // Default LLM
+        };
+    }
+    if (!config.embeddingProvider) {
+        config.embeddingProvider = {
+            apiKey: config.openaiApiKey,
+            baseUrl: config.openaiBaseUrl,
+            model: config.embeddingModel,
+            dimensions: config.embeddingDimensions,
+        };
+    }
+
+    return config;
 }
 
 /** Token budget presets */

@@ -15,14 +15,16 @@ interface HeaderCache {
 export class HeaderInjector {
     private client: OpenAI;
     private cache = new Map<string, HeaderCache>();
+    private model: string;
     private useAI: boolean;
 
-    constructor(apiKey: string, useAI = true, baseUrl?: string) {
+    constructor(apiKey: string, useAI = true, baseUrl?: string, model = 'gpt-4o-mini') {
         this.client = new OpenAI({
             apiKey,
             baseURL: baseUrl
         });
         this.useAI = useAI;
+        this.model = model;
     }
 
     /**
@@ -90,7 +92,7 @@ export class HeaderInjector {
         try {
             // Use a very short prompt to minimize token usage (~50 tokens)
             const response = await this.client.chat.completions.create({
-                model: 'gpt-4o-mini',
+                model: this.model,
                 messages: [
                     {
                         role: 'system',

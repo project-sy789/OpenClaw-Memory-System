@@ -255,12 +255,28 @@ const memory = new OpenClawMemory({
 });
 ```
 
-### Example: Using with local Ollama
+### Example: Dual Provider (Kimi + Minimax)
+
+Use **Kimi** for smart reasoning and **Minimax** for fast embeddings.
+
 ```typescript
 const memory = new OpenClawMemory({
-  openaiApiKey: 'ollama', // arbitrary
-  openaiBaseUrl: 'http://localhost:11434/v1',
-  embeddingModel: 'nomic-embed-text',
+  openaiApiKey: '...', // ignored when providers are explicit
+  
+  // Provider 1: Kimi (Smart Reasoning)
+  llmProvider: {
+    apiKey: 'YOUR_KIMI_KEY',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    model: 'moonshot-v1-8k',
+  },
+
+  // Provider 2: Minimax (Fast Embedding)
+  embeddingProvider: {
+    apiKey: 'YOUR_MINIMAX_KEY',
+    baseUrl: 'https://api.minimax.chat/v1',
+    model: 'embo-01',
+    dimensions: 1536,
+  },
 });
 ```
 

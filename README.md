@@ -253,7 +253,6 @@ const memory = new OpenClawMemory({
 ```
 
 ### Example: Using with local Ollama
-
 ```typescript
 const memory = new OpenClawMemory({
   openaiApiKey: 'ollama', // arbitrary
@@ -261,6 +260,26 @@ const memory = new OpenClawMemory({
   embeddingModel: 'nomic-embed-text',
 });
 ```
+
+## 💰 Cost Analysis
+
+| Volume | Items | Approx Cost (OpenAI text-embedding-3-small) |
+|--------|-------|---------------------------------------------|
+| Low | 1,000 chunks | ~$0.01 (~0.35 THB) |
+| Medium | 10,000 chunks | ~$0.10 (~3.50 THB) |
+| High | 100,000 chunks | ~$1.00 (~35.00 THB) |
+
+*Note: The system includes a 2-level cache (Memory + SQLite), so re-embedding the same content costs $0.*
+
+### 🛠 Tips to Reduce Costs
+
+1. **Increase Chunk Size**: Larger chunks = fewer embeddings.
+   ```typescript
+   chunkSizeMin: 500,  // default: 100
+   chunkSizeMax: 2000, // default: 1500
+   ```
+2. **Use Local Embeddings**: Use Ollama (free) as shown above.
+3. **Selective Tiering**: Store trivial conversations only in `Episodic` tier (no vector embedding).
 
 ## 📄 License
 

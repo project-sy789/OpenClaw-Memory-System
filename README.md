@@ -21,6 +21,7 @@
 | **Auto-Consolidation** | Merge similar memories + summarize old episodes |
 | **Embedding Cache** | 2-level cache (hot in-memory + persistent SQLite) |
 | **Thai Support** | Full Thai language support in tokenization and fact extraction |
+| **Persistent Config** | API keys and settings stored in SQLite (Docker-friendly) |
 
 ## 🏗 Architecture
 
@@ -140,6 +141,7 @@ npm run demo
 | `health()` | Check system status (DB, Embedder, LLM) |
 | `merge()` | Merge related memory files |
 | `stats()` | Get memory statistics |
+| `updateConfig(config)` | Update and persist new API keys or settings |
 
 ### Health Check
 Run a quick diagnostic to verify connections:
@@ -292,7 +294,19 @@ const memory = new OpenClawMemory({
 });
 ```
 
-## 💰 Cost Analysis
+## �️ Persistent Configuration & Docker
+
+OpenClaw can manage its own credentials and settings directly within its SQLite database. This is designed for environments where modifying `.env` files is difficult or impossible (e.g., restricted Docker containers).
+
+### How it works:
+1. **Initial Setup**: Provide keys via environment variables or constructor.
+2. **Runtime Update**: Use `memory.updateConfig()` to change keys on the fly.
+3. **Persistence**: New keys are saved to the `system_config` table in your database.
+4. **Self-Contained**: On next startup, OpenClaw loads keys from the database, overriding `.env` and defaults.
+
+**This makes OpenClaw a self-managed "Autonomous Brain" — you only need to give it access to its database, and it will remember its own credentials!** 🧠✨
+
+## �💰 Cost Analysis
 
 | Volume | Items | Approx Cost (OpenAI text-embedding-3-small) |
 |--------|-------|---------------------------------------------|

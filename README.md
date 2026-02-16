@@ -241,6 +241,9 @@ src/
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Custom API URL |
 | `MEMORY_DIR` | `./memory` | Memory file storage |
 | `TOKEN_BUDGET` | `4000` | Max tokens per retrieval |
+| `MAX_RETRIES` | `3` | Max API retry attempts (for 429/5xx) |
+| `RETRY_DELAY` | `1000` | Initial retry delay (ms) |
+| `BATCH_SIZE` | `50` | Max items per embedding batch |
 
 ### Example: Using with Minimax
 

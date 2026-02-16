@@ -34,6 +34,45 @@ export class EmbeddingEngine {
         this.model = model;
         this.dimensions = dimensions;
         this.storage = storage;
+        this.maxRetries = 3; // Default
+        this.retryDelay = 1000; // Default
+        this.batchSize = 50; // Default
+    }
+
+    configure(maxRetries: number, retryDelay: number, batchSize: number) {
+        this.maxRetries = maxRetries;
+        this.retryDelay = retryDelay;
+        this.batchSize = batchSize;
+    }
+
+    private maxRetries: number;
+    private retryDelay: number;
+    private batchSize: number;
+
+    /**
+     * Exponential backoff retry wrapper
+     */
+    private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+        let lastError: any;
+        for (let i = 0; i <= this.maxRetries; i++) {
+            try {
+                return await fn();
+            } catch (error: any) {
+                lastError = error;
+                // Only retry on 429 (Rate Limit) or 5xx (Server Error)
+                const status = error?.status || error?.response?.status;
+                if (status !== 429 && (!status || status < 500)) {
+                    throw error;
+                }
+
+                if (i === this.maxRetries) break;
+
+                const delay = this.retryDelay * Math.pow(2, i);
+                logger.warn(`API Error ${status}. Retrying in ${delay}ms (attempt ${i + 1}/${this.maxRetries})...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        throw lastError;
     }
 
     // ----------------------------------------------------------
@@ -122,16 +161,18 @@ export class EmbeddingEngine {
         );
 
         // Batch API call — OpenAI supports up to 2048 inputs per call
-        const batchSize = 100; // stay well under limit
+        const batchSize = this.batchSize;
         for (let i = 0; i < needsGeneration.length; i += batchSize) {
             const batch = needsGeneration.slice(i, i + batchSize);
             const texts = batch.map((b) => b.content);
 
-            const response = await this.client.embeddings.create({
-                model: this.model,
-                input: texts,
-                dimensions: this.dimensions,
-            });
+            const response = await this.withRetry(() =>
+                this.client.embeddings.create({
+                    model: this.model,
+                    input: texts,
+                    dimensions: this.dimensions,
+                })
+            );
 
             for (let j = 0; j < batch.length; j++) {
                 const { chunkId, content } = batch[j];
@@ -172,11 +213,13 @@ export class EmbeddingEngine {
         // Truncate if too long (8191 tokens max for text-embedding-3)
         const truncated = text.slice(0, 30000); // rough char limit
 
-        const response = await this.client.embeddings.create({
-            model: this.model,
-            input: truncated,
-            dimensions: this.dimensions,
-        });
+        const response = await this.withRetry(() =>
+            this.client.embeddings.create({
+                model: this.model,
+                input: truncated,
+                dimensions: this.dimensions,
+            })
+        );
 
         return new Float32Array(response.data[0].embedding);
     }

@@ -95,6 +95,13 @@ export class OpenClawMemory {
             this.config.openaiBaseUrl
         );
 
+        // Configure retry logic
+        this.embedder.configure(
+            this.config.maxRetries,
+            this.config.retryDelay,
+            this.config.batchSize
+        );
+
         // Initialize chunking
         this.chunker = new SmartChunker({
             minChunkSize: this.config.chunkSizeMin,

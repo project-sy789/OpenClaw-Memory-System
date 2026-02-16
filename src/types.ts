@@ -185,6 +185,12 @@ export interface OpenClawMemoryConfig {
     mergeThreshold?: number;
     /** Log level */
     logLevel?: 'debug' | 'info' | 'warn' | 'error';
+    /** Max retries for API calls (default: 3) */
+    maxRetries?: number;
+    /** Initial retry delay in ms (default: 1000) */
+    retryDelay?: number;
+    /** Max items per embedding batch (default: 50) */
+    batchSize?: number;
 }
 
 /** Merge result from auto-merger */

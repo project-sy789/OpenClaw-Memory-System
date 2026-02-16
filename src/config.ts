@@ -9,7 +9,10 @@ export const DEFAULT_CONFIG: Required<OpenClawMemoryConfig> = {
     openaiApiKey: '',
     openaiBaseUrl: 'https://api.openai.com/v1',
     memoryDir: './memory',
-    dbPath: undefined as any, // handled belowry.db',
+    dbPath: undefined as any, // handled below
+    maxRetries: 3,
+    retryDelay: 1000,
+    batchSize: 50,
     tokenBudget: 4000,
     embeddingModel: 'text-embedding-3-small',
     embeddingDimensions: 1536,

@@ -4,11 +4,11 @@ import { AIProvider } from '../types';
 
 /**
  * Standard OpenAI Provider implementation.
- * Use this as a reference or as the default client for the host system.
+ * Supports OpenAI-compatible APIs (Minimax, DeepSeek, Local LLMs, etc.)
  */
 export class OpenAIProvider implements AIProvider {
     private client: OpenAI;
-    private model: string;
+    private chatModel: string;
     private embeddingModel: string;
 
     constructor(apiKey: string, baseUrl?: string, chatModel = 'gpt-4o-mini', embeddingModel = 'text-embedding-3-small') {
@@ -16,7 +16,7 @@ export class OpenAIProvider implements AIProvider {
             apiKey,
             baseURL: baseUrl
         });
-        this.model = chatModel;
+        this.chatModel = chatModel;
         this.embeddingModel = embeddingModel;
     }
 
@@ -25,12 +25,18 @@ export class OpenAIProvider implements AIProvider {
             model: this.embeddingModel,
             input: texts,
         });
+
+        if (!response.data) {
+            console.error('AI Provider Error: No data in embedding response', response);
+            throw new Error(`Failed to generate embeddings: ${JSON.stringify(response)}`);
+        }
+
         return response.data.map(d => d.embedding);
     }
 
     async chat(messages: any[], options?: Record<string, any>): Promise<string> {
         const response = await this.client.chat.completions.create({
-            model: this.model,
+            model: this.chatModel,
             messages,
             ...options
         });

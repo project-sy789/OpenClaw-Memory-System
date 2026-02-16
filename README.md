@@ -12,6 +12,7 @@
 
 | Feature | Description |
 |---------|-------------|
+| **Brain-Delegate** | **New!** Fully decoupled from API keys. Host provides the AI capabilities. |
 | **5-Tier Memory** | Working → Episodic → Semantic → Procedural → Meta |
 | **Smart Chunking** | 3-phase semantic chunking (structural → boundary → hierarchy) |
 | **Auto Headers** | AI-generated semantic headers for better embedding quality |
@@ -21,9 +22,11 @@
 | **Auto-Consolidation** | Merge similar memories + summarize old episodes |
 | **Embedding Cache** | 2-level cache (hot in-memory + persistent SQLite) |
 | **Thai Support** | Full Thai language support in tokenization and fact extraction |
-| **Persistent Config** | API keys and settings stored in SQLite (Docker-friendly) |
+| **Persistent Config** | Non-sensitive settings (budget, logs) stored in SQLite (Docker-friendly) |
 
-## 🏗 Architecture
+## 🏗 Architecture (Delegated AI)
+
+OpenClaw Memory acts as a **Pure Memory Hub**. It does not own API keys; instead, it delegates all AI tasks (embeddings, chat completions) to the host application via a standardized `AIProvider` interface.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -31,14 +34,13 @@
 ├───────────┬───────────┬────────────┬────────────────┤
 │  Working  │ Episodic  │  Semantic  │  Procedural    │
 │  Memory   │  Memory   │  Memory   │  Memory        │
-│ (buffer)  │  (logs)   │ (vectors) │  (skills)      │
 ├───────────┴───────────┴────────────┴────────────────┤
 │              Hybrid Search Engine                    │
 │         Vector + BM25 + Knowledge Graph              │
 ├─────────────────────────────────────────────────────┤
-│  Smart Chunker │ Header Injector │ Token Budget     │
+│      AIProvider Interface (Delegated to Host)       │
 ├─────────────────────────────────────────────────────┤
-│  SQLite + FTS5  │  OpenAI Embeddings  │  Markdown   │
+│  SQLite + FTS5  │ AI (Embed/Chat)  │  Markdown      │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -52,56 +54,41 @@ cd OpenClaw-Memory-System
 npm install
 ```
 
-### 2. Configure (Interactive)
-The easiest way to configure OpenClaw is to run the setup wizard:
-
-```bash
-npm run setup
-```
-
-This will guide you through selecting an AI provider (OpenAI, Minimax, etc.) and automatically create your `.env` file.
-
-Alternatively, you can manually copy `.env.example` to `.env` and edit it.
-
-### 3. Use as Library
+### 2. Implement the AI Provider
+The host application manages the API keys and provides the AI logic. You can use the built-in `OpenAIProvider` for easy setup:
 
 ```typescript
-import { OpenClawMemory } from 'openclaw-memory';
+import { OpenClawMemory, OpenAIProvider } from 'openclaw-memory';
 
+// 1. Host manages API keys
+const provider = new OpenAIProvider(process.env.OPENAI_API_KEY!);
+
+// 2. Initialize Memory with the provider
 const memory = new OpenClawMemory({
-  openaiApiKey: process.env.OPENAI_API_KEY!,
+  aiProvider: provider,
   memoryDir: './memory',
   tokenBudget: 4000,
 });
-
-// Start a session
-memory.startSession('session-001');
-memory.addMessage('user', 'I prefer TypeScript and dark mode');
-memory.addMessage('assistant', 'Noted! I will use TypeScript going forward.');
-await memory.endSession();
-
-// Store facts
-await memory.rememberFact('User prefers TypeScript', ['preference'], 0.8);
-
-// Recall with hybrid search + token budget
-const { context, tokensUsed } = await memory.recall('user preferences');
-console.log(context);     // Formatted context for LLM
-console.log(tokensUsed);  // Token count (always within budget)
-
-// Maintenance (run daily)
-memory.decay();                  // Apply forgetting curve
-await memory.consolidate();      // Merge + summarize + deduplicate
-
-// Stats
-console.log(memory.printStats());
-
-memory.close();
 ```
 
-### 4. Run Demo
+### 3. Usage Example
 
-```bash
-npm run demo
+```typescript
+// Start a session (Episodic)
+memory.startSession('session-001');
+memory.addMessage('user', 'I prefer TypeScript and dark mode');
+await memory.endSession();
+
+// Store specific facts (Semantic)
+await memory.rememberFact('User prefers dark mode', ['preference'], 0.8);
+
+// Recall with hybrid search
+const { context } = await memory.recall('user preferences');
+console.log(context); 
+
+// Maintenance (Run periodically)
+memory.decay();                  // Apply forgetting curve
+await memory.consolidate();      // Organize memories + Summarize
 ```
 
 ## 📖 API Reference
@@ -113,219 +100,46 @@ npm run demo
 | `startSession(id)` | Start a new conversation session |
 | `addMessage(role, content)` | Add message to working memory |
 | `endSession()` | Flush working memory → episodic memory |
-| `getSessionState()` | Get current session info |
 
-### Store (Remember)
+### Memory Interaction
 
 | Method | Description |
 |--------|-------------|
-| `remember(input)` | Store memory (auto-chunks + embeds) |
 | `rememberFact(fact, tags, importance)` | Store a single fact |
-| `rememberProcedure(procedure)` | Store a skill/procedure |
-
-### Retrieve (Recall)
-
-| Method | Description |
-|--------|-------------|
 | `recall(query, options)` | Hybrid search with token budget |
-| `recallContext(query, maxTokens)` | Quick recall → string context |
-| `getRecentContext(limit)` | Get recent conversation context |
-| `getWorkingContext(maxTokens)` | Get current session context |
+| `recallContext(query, maxTokens)` | Quick recall → formatted string |
+| `health()` | Check system status (DB + AI Provider) |
+| `updateConfig(config)` | Update and persist settings (Budget, LogLevel, etc.) |
 
-### Maintenance
-
-| Method | Description |
-|--------|-------------|
-| `consolidate()` | Merge + summarize + deduplicate memories |
-| `decay()` | Apply memory decay (forgetting curve) |
-| `health()` | Check system status (DB, Embedder, LLM) |
-| `merge()` | Merge related memory files |
-| `stats()` | Get memory statistics |
-| `updateConfig(config)` | Update and persist new API keys or settings |
-
-### Health Check
-Run a quick diagnostic to verify connections:
-
-```bash
-npm run health
-```
-| `printStats()` | Pretty-print statistics |
-
-### RecallOptions
-
+### `AIProvider` Interface
+Implement this to use any AI model (Local or API):
 ```typescript
-{
-  maxTokens?: number;        // Token budget (default: 4000)
-  tiers?: MemoryTier[];      // Filter by tier
-  tags?: string[];           // Filter by tags
-  topK?: number;             // Max results (default: 20)
-  minRelevance?: number;     // Min score 0-1 (default: 0.15)
-  includeDecayed?: boolean;  // Include faded memories
-  timeRange?: {              // Date range filter
-    after?: string;
-    before?: string;
-  };
+interface AIProvider {
+  embed(texts: string[]): Promise<number[][]>;
+  chat(messages: any[], options?: any): Promise<string>;
+  checkHealth(): Promise<{ status: 'ok' | 'error'; latency?: number }>;
 }
 ```
 
 ## 🧪 How It Works
 
 ### Memory Flow
-
 ```
-User Message → Working Memory (ring buffer)
+User Message → Working Memory (buffer)
      ↓ (session end)
 Episodic Memory (conversation log)
      ↓ (consolidation)
 Semantic Memory (vector-indexed facts)
-     ↓ (pattern detection)
-Procedural Memory (learned skills)
 ```
-
-### Smart Chunking
-
-1. **Structural Split** — Cut along markdown headers
-2. **Semantic Boundary** — Detect topic shifts between paragraphs
-3. **Size Normalization** — Merge small / split large + add overlap
 
 ### Hybrid Search
+Queries are processed through **Vector Similarity**, **BM25 Keyword Matching**, and **Knowledge Graph Navigation**, with results merged using **Reciprocal Rank Fusion (RRF)** to ensure the most relevant context is retrieved first.
 
-```
-Query → ┌─ Vector Search (50% weight)
-        ├─ BM25 Keyword (30% weight)
-        └─ Knowledge Graph (20% weight)
-                    ↓
-          Reciprocal Rank Fusion
-                    ↓
-             Token Budget Filter
-                    ↓
-                 Context String
-```
-
-### Memory Decay
-
-```
-decay_score = importance × retention_rate^(days_since_access)
-
-- decay < 0.1 → archived
-- decay < 0.01 → deleted
-- Each access → reset timer (spaced repetition)
-```
-
-## 📂 Project Structure
-
-```
-src/
-├── index.ts                 # Main API (OpenClawMemory class)
-├── types.ts                 # TypeScript interfaces
-├── config.ts                # Configuration & constants
-├── demo.ts                  # Interactive demo
-├── utils/
-│   ├── logger.ts            # Leveled logger
-│   ├── tokenizer.ts         # Token counter (tiktoken)
-│   └── hasher.ts            # Content hashing
-├── storage/
-│   ├── sqlite.ts            # SQLite + FTS5 storage
-│   └── markdown.ts          # Markdown file manager
-├── embedding/
-│   ├── embedder.ts          # OpenAI embedding engine
-│   └── similarity.ts        # Vector similarity functions
-├── chunking/
-│   ├── smart-chunker.ts     # 3-phase semantic chunker
-│   ├── header-injector.ts   # AI semantic header generator
-│   └── auto-merger.ts       # Date + topic file merger
-├── memory/
-│   ├── working-memory.ts    # Tier 1: Session buffer
-│   ├── episodic-memory.ts   # Tier 2: Conversation logs
-│   ├── semantic-memory.ts   # Tier 3: Knowledge base
-│   └── procedural-memory.ts # Tier 4: Skills & patterns
-├── retrieval/
-│   ├── hybrid-search.ts     # Vector + BM25 + Graph search
-│   └── token-budget.ts      # Context size manager
-└── lifecycle/
-    ├── decay-manager.ts     # Ebbinghaus forgetting curve
-    └── consolidator.ts      # Memory consolidation
-```
-
-## ⚙️ Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENAI_API_KEY` | - | API key (OpenAI, Minimax, etc.) |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Custom API URL |
-| `MEMORY_DIR` | `./memory` | Memory file storage |
-| `TOKEN_BUDGET` | `4000` | Max tokens per retrieval |
-| `MAX_RETRIES` | `3` | Max API retry attempts (for 429/5xx) |
-| `RETRY_DELAY` | `1000` | Initial retry delay (ms) |
-| `BATCH_SIZE` | `50` | Max items per embedding batch |
-
-### Example: Using with Minimax
-
-```typescript
-const memory = new OpenClawMemory({
-  openaiApiKey: 'YOUR_MINIMAX_KEY',
-  openaiBaseUrl: 'https://api.minimax.chat/v1',
-  embeddingModel: 'embo-01',
-});
-```
-
-### Example: Dual Provider (Kimi + Minimax)
-
-Use **Kimi** for smart reasoning and **Minimax** for fast embeddings.
-
-```typescript
-const memory = new OpenClawMemory({
-  openaiApiKey: '...', // ignored when providers are explicit
-  
-  // Provider 1: Kimi (Smart Reasoning)
-  llmProvider: {
-    apiKey: 'YOUR_KIMI_KEY',
-    baseUrl: 'https://api.moonshot.cn/v1',
-    model: 'moonshot-v1-8k',
-  },
-
-  // Provider 2: Minimax (Fast Embedding)
-  embeddingProvider: {
-    apiKey: 'YOUR_MINIMAX_KEY',
-    baseUrl: 'https://api.minimax.chat/v1',
-    model: 'embo-01',
-    dimensions: 1536,
-  },
-});
-```
-
-## �️ Persistent Configuration & Docker
-
-OpenClaw can manage its own credentials and settings directly within its SQLite database. This is designed for environments where modifying `.env` files is difficult or impossible (e.g., restricted Docker containers).
-
-### How it works:
-1. **Initial Setup**: Provide keys via environment variables or constructor.
-2. **Runtime Update**: Use `memory.updateConfig()` to change keys on the fly.
-3. **Persistence**: New keys are saved to the `system_config` table in your database.
-4. **Self-Contained**: On next startup, OpenClaw loads keys from the database, overriding `.env` and defaults.
-
-**This makes OpenClaw a self-managed "Autonomous Brain" — you only need to give it access to its database, and it will remember its own credentials!** 🧠✨
-
-## �💰 Cost Analysis
-
-| Volume | Items | Approx Cost (OpenAI text-embedding-3-small) |
-|--------|-------|---------------------------------------------|
-| Low | 1,000 chunks | ~$0.01 (~0.35 THB) |
-| Medium | 10,000 chunks | ~$0.10 (~3.50 THB) |
-| High | 100,000 chunks | ~$1.00 (~35.00 THB) |
-
-*Note: The system includes a 2-level cache (Memory + SQLite), so re-embedding the same content costs $0.*
-
-### 🛠 Tips to Reduce Costs
-
-1. **Increase Chunk Size**: Larger chunks = fewer embeddings.
-   ```typescript
-   chunkSizeMin: 500,  // default: 100
-   chunkSizeMax: 2000, // default: 1500
-   ```
-2. **Use Local Embeddings**: Use Ollama (free) as shown above.
-3. **Selective Tiering**: Store trivial conversations only in `Episodic` tier (no vector embedding).
+## 💰 Cost Analysis (Approx.)
+The system is highly optimized. Using `text-embedding-3-small`:
+- 1,000 chunks: ~$0.01
+- 10,000 chunks: ~$0.10
+- *Note: Persistence and caching ensure you never pay for the same embedding twice.*
 
 ## 📄 License
-
 MIT © OpenClaw

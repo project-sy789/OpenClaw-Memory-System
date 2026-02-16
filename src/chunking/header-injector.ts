@@ -3,7 +3,7 @@
 // ============================================================
 // Adds contextual headers to chunks for better embedding quality.
 
-import OpenAI from 'openai';
+import { AIProvider } from '../types';
 import { hashContent } from '../utils/hasher';
 import { logger } from '../utils/logger';
 
@@ -13,18 +13,13 @@ interface HeaderCache {
 }
 
 export class HeaderInjector {
-    private client: OpenAI;
+    private provider: AIProvider;
     private cache = new Map<string, HeaderCache>();
-    private model: string;
     private useAI: boolean;
 
-    constructor(apiKey: string, useAI = true, baseUrl?: string, model = 'gpt-4o-mini') {
-        this.client = new OpenAI({
-            apiKey,
-            baseURL: baseUrl
-        });
+    constructor(provider: AIProvider, useAI = true) {
+        this.provider = provider;
         this.useAI = useAI;
-        this.model = model;
     }
 
     /**
@@ -90,28 +85,19 @@ export class HeaderInjector {
 
     private async aiGenerateHeader(content: string): Promise<string> {
         try {
-            // Use a very short prompt to minimize token usage (~50 tokens)
-            const response = await this.client.chat.completions.create({
-                model: this.model,
-                messages: [
-                    {
-                        role: 'system',
-                        content:
-                            'Generate a concise, descriptive header (max 10 words) for the following content. Format: "Topic — Subtopic". Reply with ONLY the header text, nothing else.',
-                    },
-                    {
-                        role: 'user',
-                        content: content.slice(0, 500), // Only send first 500 chars
-                    },
-                ],
+            const prompt = 'Generate a concise, descriptive header (max 10 words) for the following content. Format: "Topic — Subtopic". Reply with ONLY the header text, nothing else.';
+
+            const header = await this.provider.chat([
+                { role: 'system', content: prompt },
+                { role: 'user', content: content.slice(0, 500) }
+            ], {
                 max_tokens: 30,
-                temperature: 0.3,
+                temperature: 0.3
             });
 
-            const header =
-                response.choices[0]?.message?.content?.trim() ?? this.ruleBasedHeader(content);
-            logger.debug(`AI header: "${header}"`);
-            return header;
+            const cleanedHeader = header.trim() || this.ruleBasedHeader(content);
+            logger.debug(`AI header: "${cleanedHeader}"`);
+            return cleanedHeader;
         } catch (error) {
             logger.warn('AI header generation failed, falling back to rule-based');
             return this.ruleBasedHeader(content);

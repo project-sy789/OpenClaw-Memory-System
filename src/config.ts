@@ -5,16 +5,12 @@
 import { OpenClawMemoryConfig } from './types';
 
 /** Default configuration values */
-export const DEFAULT_CONFIG: Required<OpenClawMemoryConfig> = {
-    openaiApiKey: '',
-    openaiBaseUrl: 'https://api.openai.com/v1',
+export const DEFAULT_CONFIG: Omit<Required<OpenClawMemoryConfig>, 'aiProvider'> = {
     memoryDir: './memory',
     dbPath: undefined as any, // handled below
     maxRetries: 3,
     retryDelay: 1000,
     batchSize: 50,
-    llmProvider: undefined as any,
-    embeddingProvider: undefined as any,
     tokenBudget: 4000,
     embeddingModel: 'text-embedding-3-small',
     embeddingDimensions: 1536,
@@ -37,24 +33,7 @@ export function resolveConfig(
         dbPath:
             userConfig.dbPath ??
             `${userConfig.memoryDir ?? DEFAULT_CONFIG.memoryDir}/openclaw-memory.db`,
-    };
-
-    // Backwards compatibility: Map legacy fields to new provider structure if missing
-    if (!config.llmProvider) {
-        config.llmProvider = {
-            apiKey: config.openaiApiKey,
-            baseUrl: config.openaiBaseUrl,
-            model: 'gpt-4o-mini', // Default LLM
-        };
-    }
-    if (!config.embeddingProvider) {
-        config.embeddingProvider = {
-            apiKey: config.openaiApiKey,
-            baseUrl: config.openaiBaseUrl,
-            model: config.embeddingModel,
-            dimensions: config.embeddingDimensions,
-        };
-    }
+    } as Required<OpenClawMemoryConfig>;
 
     return config;
 }

@@ -158,19 +158,20 @@ export interface WorkingMemoryEntry {
     timestamp: string;
 }
 
+import { AIProvider } from './ai-provider';
+export { AIProvider };
+
 /** Configuration for the OpenClaw Memory System */
 export interface OpenClawMemoryConfig {
-    /** OpenAI API key for embeddings */
-    openaiApiKey: string;
-    /** Optional Base URL for OpenAI-compatible providers (e.g., Minimax, OpenRouter) */
-    openaiBaseUrl?: string;
+    /** AI Provider to delegate embedding and chat tasks to */
+    aiProvider: AIProvider;
     /** Directory for memory markdown files */
     memoryDir?: string;
     /** SQLite database path */
     dbPath?: string;
     /** Max tokens for retrieval context */
     tokenBudget?: number;
-    /** Embedding model (default: text-embedding-3-small) */
+    /** Embedding model identifier (for metadata/cache tracking) */
     embeddingModel?: string;
     /** Embedding dimensions (default: 1536) */
     embeddingDimensions?: number;
@@ -178,6 +179,7 @@ export interface OpenClawMemoryConfig {
     workingMemorySize?: number;
     /** Chunk size limits */
     chunkSizeMin?: number;
+    /** Chunk sizeMax */
     chunkSizeMax?: number;
     /** Decay retention rate per day (0-1, default: 0.95) */
     decayRetentionRate?: number;
@@ -185,27 +187,12 @@ export interface OpenClawMemoryConfig {
     mergeThreshold?: number;
     /** Log level */
     logLevel?: 'debug' | 'info' | 'warn' | 'error';
-    /** Max retries for API calls (default: 3) */
+    /** Max retries for API/Internal calls (default: 3) */
     maxRetries?: number;
     /** Initial retry delay in ms (default: 1000) */
     retryDelay?: number;
     /** Max items per embedding batch (default: 50) */
     batchSize?: number;
-
-    // --- Dual Provider Support ---
-    /** LLM Provider (for text generation/reasoning) */
-    llmProvider?: {
-        apiKey: string;
-        baseUrl?: string;
-        model?: string;
-    };
-    /** Embedding Provider (for vector generation) */
-    embeddingProvider?: {
-        apiKey: string;
-        baseUrl?: string;
-        model?: string;
-        dimensions?: number;
-    };
 }
 
 /** Merge result from auto-merger */

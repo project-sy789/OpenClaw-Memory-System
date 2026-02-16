@@ -1,6 +1,6 @@
 
 import { OpenClawMemory } from '../index';
-import { resolveConfig } from '../config';
+import { OpenAIProvider } from '../providers/openai';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -8,26 +8,22 @@ import * as path from 'path';
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 async function main() {
-    console.log('🏥 OpenClaw Health Check...');
+    console.log('🏥 OpenClaw Health Check (Delegated AI)...');
 
-    const config = {
-        openaiApiKey: process.env.OPENAI_API_KEY || '',
-        openaiBaseUrl: process.env.OPENAI_BASE_URL,
-        // If these are set in env they will be picked up by resolveConfig usually
-        // but let's pass them if available
-        llmProvider: process.env.LLM_API_KEY ? {
-            apiKey: process.env.LLM_API_KEY,
-            baseUrl: process.env.LLM_BASE_URL,
-            model: process.env.LLM_MODEL
-        } : undefined,
-        embeddingProvider: process.env.EMBEDDING_API_KEY ? {
-            apiKey: process.env.EMBEDDING_API_KEY,
-            baseUrl: process.env.EMBEDDING_BASE_URL,
-            model: process.env.EMBEDDING_MODEL
-        } : undefined
-    };
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+        console.error('❌ ERROR: OPENAI_API_KEY not found in .env');
+        process.exit(1);
+    }
 
-    const memory = new OpenClawMemory(config);
+    // 1. Host provides the AI capabilities
+    const provider = new OpenAIProvider(apiKey, process.env.OPENAI_BASE_URL);
+
+    // 2. Initialize Memory System with the provider
+    const memory = new OpenClawMemory({
+        aiProvider: provider,
+        logLevel: 'info'
+    });
 
     try {
         const report = await memory.health();
@@ -36,20 +32,14 @@ async function main() {
         console.log(`🕒 Timestamp: ${report.timestamp}`);
         console.log('----------------------------------------');
 
-        console.log('💾 Database:         ', report.components.database.status === 'ok' ? '✅ OK' : `❌ Error: ${report.components.database.details}`);
+        console.log('💾 Database:         ', report.components.database.status === 'ok' ? '✅ OK' : `❌ Error`);
 
-        const embed = report.components.embeddingProvider;
-        console.log('🧠 Embedding API:    ', embed.status === 'ok' ? `✅ OK (${embed.latency}ms)` : `❌ Error: ${embed.message}`);
-
-        const llm = report.components.llmProvider;
-        console.log('🤖 LLM API:          ', llm.status === 'ok' ? `✅ OK (${llm.latency}ms)` : `❌ Error: ${llm.message}`);
+        const providerStatus = report.components.embeddingProvider;
+        console.log('🧠 AI Provider:      ', providerStatus.status === 'ok' ? `✅ OK (${providerStatus.latency}ms)` : `❌ Error: ${providerStatus.message}`);
 
         console.log('----------------------------------------');
 
-        // Cleanup
         memory.close();
-
-        if (report.status === 'error') process.exit(1);
     } catch (error) {
         console.error('❌ Critical Error during health check:', error);
         process.exit(1);

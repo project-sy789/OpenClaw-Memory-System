@@ -3,14 +3,13 @@
 // ============================================================
 // Handles OpenAI embedding generation with smart caching.
 
-import OpenAI from 'openai';
-import { EmbeddingRecord } from '../types';
+import { EmbeddingRecord, AIProvider } from '../types';
 import { SQLiteStorage } from '../storage/sqlite';
 import { hashContent } from '../utils/hasher';
 import { logger } from '../utils/logger';
 
 export class EmbeddingEngine {
-    private client: OpenAI;
+    private provider: AIProvider;
     private model: string;
     private dimensions: number;
     private storage: SQLiteStorage;
@@ -21,16 +20,12 @@ export class EmbeddingEngine {
     private cacheMisses = 0;
 
     constructor(
-        apiKey: string,
+        provider: AIProvider,
         model: string,
         dimensions: number,
-        storage: SQLiteStorage,
-        baseUrl?: string
+        storage: SQLiteStorage
     ) {
-        this.client = new OpenAI({
-            apiKey,
-            baseURL: baseUrl
-        });
+        this.provider = provider;
         this.model = model;
         this.dimensions = dimensions;
         this.storage = storage;
@@ -160,23 +155,17 @@ export class EmbeddingEngine {
             `Generating ${needsGeneration.length} embeddings (${results.size} cache hits)`
         );
 
-        // Batch API call — OpenAI supports up to 2048 inputs per call
+        // Batch call to host provider
         const batchSize = this.batchSize;
         for (let i = 0; i < needsGeneration.length; i += batchSize) {
             const batch = needsGeneration.slice(i, i + batchSize);
             const texts = batch.map((b) => b.content);
 
-            const response = await this.withRetry(() =>
-                this.client.embeddings.create({
-                    model: this.model,
-                    input: texts,
-                    dimensions: this.dimensions,
-                })
-            );
+            const embeddings = await this.provider.embed(texts);
 
             for (let j = 0; j < batch.length; j++) {
                 const { chunkId, content } = batch[j];
-                const embedding = new Float32Array(response.data[j].embedding);
+                const embedding = new Float32Array(embeddings[j]);
 
                 // Store in DB + hot cache
                 const record: EmbeddingRecord = {
@@ -205,23 +194,20 @@ export class EmbeddingEngine {
         return this.generateEmbedding(query);
     }
 
-    // ----------------------------------------------------------
-    // Internals
-    // ----------------------------------------------------------
-
+    /**
+     * Internal embedding generation via delegating to the host's AI Provider.
+     */
     private async generateEmbedding(text: string): Promise<Float32Array> {
-        // Truncate if too long (8191 tokens max for text-embedding-3)
-        const truncated = text.slice(0, 30000); // rough char limit
+        // Truncate if too long (optional safety measure)
+        const truncated = text.slice(0, 30000);
 
-        const response = await this.withRetry(() =>
-            this.client.embeddings.create({
-                model: this.model,
-                input: truncated,
-                dimensions: this.dimensions,
-            })
-        );
+        const results = await this.provider.embed([truncated]);
 
-        return new Float32Array(response.data[0].embedding);
+        if (!results || results.length === 0) {
+            throw new Error('AI Provider failed to generate embedding');
+        }
+
+        return new Float32Array(results[0]);
     }
 
     // ----------------------------------------------------------

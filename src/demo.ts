@@ -29,7 +29,7 @@ async function runDemo() {
     console.log(`🔌 Connecting OpenClaw to Brain: ${isMinimax ? `Minimax (${isInternational ? 'International' : 'Domestic'})` : 'OpenAI'}`);
 
     // Select models based on provider
-    const chatModel = isMinimax ? (process.env.LLM_MODEL || 'abab6.5s-chat') : 'gpt-4o-mini';
+    const chatModel = isMinimax ? (process.env.LLM_MODEL || 'MiniMax-M2.5') : 'gpt-4o-mini';
     const embedModel = isMinimax ? (process.env.EMBEDDING_MODEL || 'embo-01') : 'text-embedding-3-small';
 
     // 1. Initialize the AI Provider (The Host handles the API Key)

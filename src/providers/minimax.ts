@@ -5,7 +5,7 @@ import { logger } from '../utils/logger';
 /**
  * Specialized Minimax Provider.
  * Supports Minimax International/Domestic and Anthropic-compatible gateways.
- * Uses native fetch for zero-dependency operation.
+ * Handles Minimax-specific parameter names (texts) and response formats.
  */
 export class MinimaxProvider implements AIProvider {
     private apiKey: string;
@@ -24,17 +24,18 @@ export class MinimaxProvider implements AIProvider {
     }) {
         this.apiKey = options.apiKey;
 
-        // Handle gateways (like the Anthropic-style manual provided by the user)
-        const base = options.baseUrl || 'https://api.minimax.chat/v1';
+        const base = options.baseUrl || 'https://api.minimaxi.chat/v1';
         this.chatUrl = options.chatUrl || `${base}/chat/completions`;
         this.embedUrl = options.embedUrl || `${base}/embeddings`;
 
-        this.chatModel = options.chatModel || 'abab6.5s-chat';
+        this.chatModel = options.chatModel || 'MiniMax-M2.5';
         this.embedModel = options.embedModel || 'embo-01';
     }
 
     async embed(texts: string[]): Promise<number[][]> {
         try {
+            // Minimax International/Domestic often expects 'texts' instead of 'input' 
+            // even on OpenAI-compatible endpoints for certain models.
             const response = await fetch(this.embedUrl, {
                 method: 'POST',
                 headers: {
@@ -43,28 +44,33 @@ export class MinimaxProvider implements AIProvider {
                 },
                 body: JSON.stringify({
                     model: this.embedModel,
-                    input: texts,
+                    texts: texts, // Changed from 'input' to 'texts'
+                    type: 'db',   // Required for Minimax embeddings
                 }),
             });
 
             if (!response.ok) {
                 const errorData: any = await response.json().catch(() => ({}));
                 const msg = errorData.base_resp?.status_msg || errorData.error?.message || response.statusText;
-                throw new Error(`Minimax HTTP Error (${response.status}): ${msg}`);
+                throw new Error(`Minimax Embedding HTTP Error (${response.status}): ${msg}`);
             }
 
             const data: any = await response.json();
 
-            // Handle Minimax specific base_resp format
             if (data.base_resp && data.base_resp.status_code !== 0) {
                 throw new Error(`Minimax API Error (${data.base_resp.status_code}): ${data.base_resp.status_msg}`);
             }
 
-            if (!data.data || !Array.isArray(data.data)) {
-                throw new Error('Minimax API Error: Unexpected response format (missing data array)');
+            // Minimax returns 'vectors' or 'data[].embedding' depending on endpoint
+            if (data.vectors && Array.isArray(data.vectors)) {
+                return data.vectors;
             }
 
-            return data.data.map((d: any) => d.embedding);
+            if (data.data && Array.isArray(data.data)) {
+                return data.data.map((d: any) => d.embedding || d.vector);
+            }
+
+            throw new Error(`Minimax API Error: Unexpected response format: ${JSON.stringify(data)}`);
         } catch (error: any) {
             logger.error(`Minimax Embedding failed: ${error.message}`);
             throw error;
@@ -89,7 +95,7 @@ export class MinimaxProvider implements AIProvider {
             if (!response.ok) {
                 const errorData: any = await response.json().catch(() => ({}));
                 const msg = errorData.base_resp?.status_msg || errorData.error?.message || response.statusText;
-                throw new Error(`Minimax HTTP Error (${response.status}): ${msg}`);
+                throw new Error(`Minimax Chat HTTP Error (${response.status}): ${msg}`);
             }
 
             const data: any = await response.json();

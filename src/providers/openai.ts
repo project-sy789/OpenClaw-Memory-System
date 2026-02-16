@@ -9,18 +9,20 @@ import { AIProvider } from '../types';
 export class OpenAIProvider implements AIProvider {
     private client: OpenAI;
     private model: string;
+    private embeddingModel: string;
 
-    constructor(apiKey: string, baseUrl?: string, model = 'gpt-4o-mini') {
+    constructor(apiKey: string, baseUrl?: string, chatModel = 'gpt-4o-mini', embeddingModel = 'text-embedding-3-small') {
         this.client = new OpenAI({
             apiKey,
             baseURL: baseUrl
         });
-        this.model = model;
+        this.model = chatModel;
+        this.embeddingModel = embeddingModel;
     }
 
     async embed(texts: string[]): Promise<number[][]> {
         const response = await this.client.embeddings.create({
-            model: 'text-embedding-3-small',
+            model: this.embeddingModel,
             input: texts,
         });
         return response.data.map(d => d.embedding);

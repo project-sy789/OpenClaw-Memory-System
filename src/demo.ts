@@ -11,18 +11,23 @@ async function runDemo() {
     console.log('--- 🧠 OpenClaw Memory System Demo (Delegated AI) ---');
 
     // Detect available brain (Minimax or OpenAI)
+    const isMinimax = !!process.env.MINIMAX_API_KEY;
     const apiKey = process.env.MINIMAX_API_KEY || process.env.OPENAI_API_KEY;
-    const baseUrl = process.env.MINIMAX_BASE_URL || 'https://api.minimax.chat/v1' || process.env.OPENAI_BASE_URL;
+    const baseUrl = process.env.MINIMAX_BASE_URL || (isMinimax ? 'https://api.minimax.chat/v1' : undefined) || process.env.OPENAI_BASE_URL;
 
     if (!apiKey) {
         console.error('ERROR: No AI Brain found! (Please set MINIMAX_API_KEY or OPENAI_API_KEY)');
         return;
     }
 
-    console.log(`🔌 Connecting OpenClaw to Brain: ${process.env.MINIMAX_API_KEY ? 'Minimax' : 'OpenAI'}`);
+    console.log(`🔌 Connecting OpenClaw to Brain: ${isMinimax ? 'Minimax' : 'OpenAI'}`);
+
+    // Select models based on provider
+    const chatModel = isMinimax ? (process.env.LLM_MODEL || 'abab6.5s-chat') : 'gpt-4o-mini';
+    const embedModel = isMinimax ? (process.env.EMBEDDING_MODEL || 'embo-01') : 'text-embedding-3-small';
 
     // 1. Initialize the AI Provider (The Host handles the API Key)
-    const provider = new OpenAIProvider(apiKey, baseUrl);
+    const provider = new OpenAIProvider(apiKey, baseUrl, chatModel, embedModel);
 
     // 2. Initialize the Memory System with the provider
     const memory = new OpenClawMemory({

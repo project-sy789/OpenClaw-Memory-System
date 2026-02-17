@@ -20,7 +20,7 @@
         {
             "parameters": {
                 "requestMethod": "POST",
-                "url": "http://127.0.0.1:3001/chat",
+                "url": "https://88.99.168.204.nip.io/memory/chat",
                 "jsonParameters": true,
                 "options": {},
                 "bodyParametersUi": {

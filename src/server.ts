@@ -27,8 +27,13 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Fix for ESM __dirname
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 // Middleware
-// app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -40,15 +45,6 @@ app.use((req, res, next) => {
         console.log(`${new Date().toISOString()} ${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
     });
     next();
-});
-
-// Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error('Error:', err);
-    res.status(500).json({
-        error: err.message || 'Internal server error',
-        code: err.code || 'INTERNAL_ERROR'
-    });
 });
 
 // Create AI Provider
@@ -399,6 +395,16 @@ app.get('/recent', (req, res) => {
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
+});
+
+// Final Error handling middleware (MUST BE LAST)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('GLOBAL ERROR:', err);
+    res.status(500).json({
+        error: err.message || 'Internal server error',
+        code: err.code || 'INTERNAL_ERROR',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
 });
 
 // ============ SERVER ============

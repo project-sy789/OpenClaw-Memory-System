@@ -8,8 +8,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --production
+# Install ALL dependencies (including dev for TypeScript)
+RUN npm install
 
 # Copy source
 COPY . .
@@ -24,7 +24,7 @@ RUN mkdir -p /app/memory /app/logs
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-EXPOSE 3000
+EXPOSE 3001
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["stats"]

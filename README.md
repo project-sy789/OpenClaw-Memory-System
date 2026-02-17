@@ -10,10 +10,10 @@
 
 OpenClaw รองรับการติดตั้ง 2 รูปแบบหลัก:
 
-### Option A: Docker Service (Recommended)
-เหมาะสำหรับรันเป็น Service แยก (Sidecar) คู่กับแอพพลิเคชันของคุณ ง่ายและจัดการ environment ได้สะดวก
+### Option A: แบบ Service แยก (Docker Sidecar) - แนะนำ
+เหมาะสำหรับรัน OpenClaw เป็น Container อิสระ (Service) แล้วเชื่อมต่อจาก App หลักของคุณผ่าน Network (เหมือน Database)
 
-1. **Clone & Setup:**
+1. **Setup & Run:**
    ```bash
    git clone https://github.com/project-sy789/OpenClaw-Memory-System.git
    cd OpenClaw-Memory-System
@@ -40,8 +40,8 @@ OpenClaw รองรับการติดตั้ง 2 รูปแบบ�
 
 ---
 
-### Option B: Standalone Library / Local
-เหมาะสำหรับ Developer ที่ต้องการ import ไปใช้ใน Code TypeScript/Node.js หรือรันบนเครื่องโดยตรง
+### Option B: แบบฝังในโปรเจค (NPM Library)
+เหมาะสำหรับ Developer ที่ต้องการ `import` OpenClaw ไปใช้ใน Code TypeScript/Node.js ของคุณโดยตรง (รันใน Docker Container ของ App หลัก หรือ Local)
 
 1. **Install Dependencies:**
    ```bash

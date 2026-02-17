@@ -195,12 +195,14 @@
             try {
                 const res = await fetch(`${API}/stats`);
                 const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Server Error');
+                
                 document.getElementById('totalChunks').textContent = data.totalChunks || 0;
                 document.getElementById('totalEpisodes').textContent = data.totalEpisodes || 0;
                 document.getElementById('cacheHit').textContent = 
                     Math.round((data.cacheHitRate || 0) * 100) + '%';
             } catch (e) {
-                document.getElementById('stats').innerHTML = '<p style="color:#f87171">API not running. Start with: docker-compose up -d api</p>';
+                document.getElementById('stats').innerHTML = `<p style="color:#f87171">Error: ${e.message}</p>`;
             }
         }
         
@@ -209,9 +211,10 @@
             try {
                 const res = await fetch(`${API}/health`);
                 const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Server Error');
                 document.getElementById('health').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
             } catch (e) {
-                document.getElementById('health').innerHTML = '<p style="color:#f87171">API not running</p>';
+                document.getElementById('health').innerHTML = `<p style="color:#f87171">Error: ${e.message}</p>`;
             }
         }
         

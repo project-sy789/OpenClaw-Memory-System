@@ -1,7 +1,4 @@
-# Dependencies - DON'T exclude! Need for build
-# node_modules
-
-# Build outputs - exclude initially
+# Build outputs
 dist
 *.tsbuildinfo
 
@@ -23,7 +20,7 @@ Thumbs.db
 logs
 *.log
 
-# Memory DB (keep directory but not files)
+# Memory DB
 memory/*
 !memory/.gitkeep
 
@@ -31,11 +28,10 @@ memory/*
 test
 coverage
 
-# Docs to exclude
+# Docs
 *.md
 !README.md
 
 # Environment
 .env
 .env.local
-.env.example

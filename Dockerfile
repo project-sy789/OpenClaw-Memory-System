@@ -1,7 +1,7 @@
-FROM node:18-bookworm-slim
+FROM node:18-slim
 
-# Install build dependencies for better-sqlite3
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
@@ -9,26 +9,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy all files
+COPY . .
 
-# Install ALL dependencies
+# Install dependencies
 RUN npm install
 
-# Copy source code
-COPY src/ ./src/
-COPY cli.ts ./
-COPY server.ts ./
-COPY export.ts ./
-COPY dashboard.html ./
-COPY docker-entrypoint.sh ./
-COPY tsconfig.json ./
-COPY .env.example ./
+# Build
+RUN npm run build
 
-# Build TypeScript
-RUN npx tsc
-
-# Create directories  
+# Create directories
 RUN mkdir -p memory logs
 
 EXPOSE 3001

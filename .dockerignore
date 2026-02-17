@@ -1,37 +1,8 @@
-# Build outputs
+node_modules
 dist
-*.tsbuildinfo
-
-# IDE
-.vscode
-.idea
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Git
 .git
-.gitignore
-
-# Logs
-logs
-*.log
-
-# Memory DB
-memory/*
-!memory/.gitkeep
-
-# Test
-test
-coverage
-
-# Docs
-*.md
-!README.md
-
-# Environment
 .env
-.env.local
+memory
+data
+*.db
+*.log

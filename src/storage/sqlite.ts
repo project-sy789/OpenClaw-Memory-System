@@ -119,6 +119,36 @@ export class SQLiteStorage {
           updated_at TEXT NOT NULL
         );
 
+        -- Meta-Memory: detailed query analytics
+        CREATE TABLE IF NOT EXISTS meta_query_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          query TEXT NOT NULL,
+          result_count INTEGER NOT NULL DEFAULT 0,
+          avg_score REAL NOT NULL DEFAULT 0,
+          best_source TEXT,
+          mode_used TEXT NOT NULL DEFAULT 'hybrid',
+          latency_ms INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL
+        );
+
+        -- Meta-Memory: co-access patterns (which chunks appear together)
+        CREATE TABLE IF NOT EXISTS meta_access_patterns (
+          chunk_id_a TEXT NOT NULL,
+          chunk_id_b TEXT NOT NULL,
+          co_access_count INTEGER NOT NULL DEFAULT 1,
+          last_co_accessed_at TEXT NOT NULL,
+          PRIMARY KEY (chunk_id_a, chunk_id_b)
+        );
+
+        -- Meta-Memory: learned search weight recommendations
+        CREATE TABLE IF NOT EXISTS meta_weight_tuning (
+          source TEXT PRIMARY KEY,
+          recommended_weight REAL NOT NULL,
+          sample_count INTEGER NOT NULL DEFAULT 0,
+          avg_contribution REAL NOT NULL DEFAULT 0,
+          last_updated TEXT NOT NULL
+        );
+
       -- Indexes for performance
       CREATE INDEX IF NOT EXISTS idx_chunks_tier ON memory_chunks(tier);
       CREATE INDEX IF NOT EXISTS idx_chunks_decay ON memory_chunks(decay_score);
@@ -129,6 +159,8 @@ export class SQLiteStorage {
       CREATE INDEX IF NOT EXISTS idx_edges_from ON knowledge_edges(from_chunk_id);
       CREATE INDEX IF NOT EXISTS idx_edges_to ON knowledge_edges(to_chunk_id);
       CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON embeddings(content_hash);
+      CREATE INDEX IF NOT EXISTS idx_meta_query_log_created ON meta_query_log(created_at);
+      CREATE INDEX IF NOT EXISTS idx_meta_access_patterns_count ON meta_access_patterns(co_access_count DESC);
     `);
 
         // FTS5 full-text search index (create separately — can't do IF NOT EXISTS)
@@ -815,6 +847,138 @@ export class SQLiteStorage {
             }
         }
         return config;
+    }
+
+    // ----------------------------------------------------------
+    // Meta-Memory Analytics
+    // ----------------------------------------------------------
+
+    /** Log a meta-query for retrieval analytics */
+    logMetaQuery(entry: {
+        query: string;
+        resultCount: number;
+        avgScore: number;
+        bestSource: string | null;
+        modeUsed: string;
+        latencyMs: number;
+    }): void {
+        const now = new Date().toISOString();
+        this.db
+            .prepare(
+                `INSERT INTO meta_query_log (query, result_count, avg_score, best_source, mode_used, latency_ms, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`
+            )
+            .run(
+                entry.query,
+                entry.resultCount,
+                entry.avgScore,
+                entry.bestSource,
+                entry.modeUsed,
+                entry.latencyMs,
+                now
+            );
+    }
+
+    /** Record co-access pattern between chunks */
+    recordCoAccess(chunkIds: string[]): void {
+        if (chunkIds.length < 2) return;
+        const now = new Date().toISOString();
+        const upsert = this.db.prepare(
+            `INSERT INTO meta_access_patterns (chunk_id_a, chunk_id_b, co_access_count, last_co_accessed_at)
+             VALUES (?, ?, 1, ?)
+             ON CONFLICT(chunk_id_a, chunk_id_b) DO UPDATE SET
+               co_access_count = co_access_count + 1,
+               last_co_accessed_at = ?`
+        );
+
+        const transaction = this.db.transaction(() => {
+            // Record pairs (ordered to avoid duplicates)
+            for (let i = 0; i < Math.min(chunkIds.length, 10); i++) {
+                for (let j = i + 1; j < Math.min(chunkIds.length, 10); j++) {
+                    const [a, b] = [chunkIds[i], chunkIds[j]].sort();
+                    upsert.run(a, b, now, now);
+                }
+            }
+        });
+        transaction();
+    }
+
+    /** Update weight tuning based on search results */
+    updateWeightTuning(source: string, contributionScore: number): void {
+        const now = new Date().toISOString();
+        this.db
+            .prepare(
+                `INSERT INTO meta_weight_tuning (source, recommended_weight, sample_count, avg_contribution, last_updated)
+                 VALUES (?, ?, 1, ?, ?)
+                 ON CONFLICT(source) DO UPDATE SET
+                   sample_count = sample_count + 1,
+                   avg_contribution = (avg_contribution * (sample_count - 1) + ?) / sample_count,
+                   recommended_weight = (avg_contribution * (sample_count - 1) + ?) / sample_count,
+                   last_updated = ?`
+            )
+            .run(source, contributionScore, contributionScore, now, contributionScore, contributionScore, now);
+    }
+
+    /** Get meta-memory insights */
+    getMetaInsights(): {
+        totalQueries: number;
+        avgResultCount: number;
+        avgScore: number;
+        topCoAccessPairs: { chunkA: string; chunkB: string; count: number }[];
+        weightRecommendations: { source: string; weight: number; samples: number }[];
+        queryHistory: { query: string; resultCount: number; avgScore: number; mode: string; createdAt: string }[];
+        modeDistribution: Record<string, number>;
+    } {
+        const totalQueries = (
+            this.db.prepare('SELECT COUNT(*) as c FROM meta_query_log').get() as { c: number }
+        ).c ?? 0;
+
+        const avgResultCount = (
+            this.db.prepare('SELECT COALESCE(AVG(result_count), 0) as a FROM meta_query_log').get() as { a: number }
+        ).a ?? 0;
+
+        const avgScore = (
+            this.db.prepare('SELECT COALESCE(AVG(avg_score), 0) as a FROM meta_query_log').get() as { a: number }
+        ).a ?? 0;
+
+        const topCoAccessPairs = (
+            this.db.prepare(
+                `SELECT chunk_id_a, chunk_id_b, co_access_count
+                 FROM meta_access_patterns ORDER BY co_access_count DESC LIMIT 10`
+            ).all() as { chunk_id_a: string; chunk_id_b: string; co_access_count: number }[]
+        ).map(r => ({ chunkA: r.chunk_id_a, chunkB: r.chunk_id_b, count: r.co_access_count }));
+
+        const weightRecommendations = (
+            this.db.prepare(
+                `SELECT source, recommended_weight, sample_count
+                 FROM meta_weight_tuning ORDER BY sample_count DESC`
+            ).all() as { source: string; recommended_weight: number; sample_count: number }[]
+        ).map(r => ({ source: r.source, weight: r.recommended_weight, samples: r.sample_count }));
+
+        const queryHistory = (
+            this.db.prepare(
+                `SELECT query, result_count, avg_score, mode_used, created_at
+                 FROM meta_query_log ORDER BY created_at DESC LIMIT 20`
+            ).all() as { query: string; result_count: number; avg_score: number; mode_used: string; created_at: string }[]
+        ).map(r => ({ query: r.query, resultCount: r.result_count, avgScore: r.avg_score, mode: r.mode_used, createdAt: r.created_at }));
+
+        const modeRows = this.db.prepare(
+            `SELECT mode_used, COUNT(*) as cnt FROM meta_query_log GROUP BY mode_used`
+        ).all() as { mode_used: string; cnt: number }[];
+        const modeDistribution: Record<string, number> = {};
+        for (const row of modeRows) {
+            modeDistribution[row.mode_used] = row.cnt;
+        }
+
+        return {
+            totalQueries,
+            avgResultCount,
+            avgScore,
+            topCoAccessPairs,
+            weightRecommendations,
+            queryHistory,
+            modeDistribution,
+        };
     }
 
     close(): void {

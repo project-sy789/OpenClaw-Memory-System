@@ -2,36 +2,54 @@
 // OpenClaw Memory System — Hybrid Search Engine
 // ============================================================
 // Combines Vector Search + BM25 Keyword + Knowledge Graph.
+// Supports 3 modes: 'hybrid' (embedding), 'brain' (LLM), 'auto'.
 
 import { SQLiteStorage } from '../storage/sqlite';
 import { EmbeddingEngine } from '../embedding/embedder';
 import { topKSimilar, normalizeScore } from '../embedding/similarity';
-import { MemoryChunk, MemoryTier, RetrievalResult, RecallOptions } from '../types';
+import { MemoryChunk, MemoryTier, RetrievalResult, RecallOptions, AIProvider, SearchMode } from '../types';
 import { RETRIEVAL_CONFIG } from '../config';
+import { BrainSearch } from './brain-search';
 import { hashContent } from '../utils/hasher';
 import { logger } from '../utils/logger';
 
 export class HybridSearch {
     private storage: SQLiteStorage;
     private embedder: EmbeddingEngine;
+    private brainSearch: BrainSearch | null = null;
+    private defaultSearchMode: SearchMode;
 
-    constructor(storage: SQLiteStorage, embedder: EmbeddingEngine) {
+    constructor(
+        storage: SQLiteStorage,
+        embedder: EmbeddingEngine,
+        provider?: AIProvider,
+        searchMode: SearchMode = 'auto'
+    ) {
         this.storage = storage;
         this.embedder = embedder;
+        this.defaultSearchMode = searchMode;
+
+        if (provider) {
+            this.brainSearch = new BrainSearch(storage, provider);
+        }
     }
 
     /**
      * Main search method — fuses results from multiple search strategies.
+     * Supports 3 modes:
+     * - 'hybrid': Vector + BM25 + Graph (requires embeddings)
+     * - 'brain': BM25 + LLM relevance judging (no embeddings needed)
+     * - 'auto': tries hybrid, falls back to brain on embedding errors
      */
     async search(
         query: string,
         options: RecallOptions = {}
     ): Promise<RetrievalResult[]> {
+        const mode = options.searchMode ?? this.defaultSearchMode;
         const topK = options.topK ?? RETRIEVAL_CONFIG.defaultTopK;
-        const minRelevance =
-            options.minRelevance ?? RETRIEVAL_CONFIG.minRelevanceScore;
+        const minRelevance = options.minRelevance ?? RETRIEVAL_CONFIG.minRelevanceScore;
 
-        // Check semantic cache first
+        // Check semantic cache first (works for all modes)
         const queryHash = hashContent(query);
         const cached = this.storage.getSemanticCache(queryHash);
         if (cached) {
@@ -46,11 +64,96 @@ export class HybridSearch {
                     vectorScore: cached.scores[i],
                     keywordScore: 0,
                     graphScore: 0,
+                    brainScore: 0,
                     source: 'fused',
                 });
             }
             return results;
         }
+
+        // Route to the appropriate search mode
+        let results: RetrievalResult[];
+        let modeUsed: string;
+
+        if (mode === 'brain') {
+            results = await this.brainModeSearch(query, options);
+            modeUsed = 'brain';
+        } else if (mode === 'auto') {
+            try {
+                results = await this.hybridModeSearch(query, options);
+                modeUsed = 'hybrid';
+            } catch (error: any) {
+                // Check if it's a rate-limit or embedding error
+                const isRateLimit = error.message?.includes('rate') ||
+                    error.message?.includes('429') ||
+                    error.message?.includes('limit') ||
+                    error.message?.includes('quota');
+
+                if (isRateLimit && this.brainSearch) {
+                    logger.warn(`⚡ Auto mode: embedding rate-limited, falling back to brain search`);
+                    results = await this.brainModeSearch(query, options);
+                    modeUsed = 'brain-fallback';
+                } else {
+                    throw error;
+                }
+            }
+        } else {
+            results = await this.hybridModeSearch(query, options);
+            modeUsed = 'hybrid';
+        }
+
+        // Filter by minimum relevance
+        const filtered = results.filter((r) => r.score >= minRelevance);
+
+        // Touch accessed chunks
+        for (const r of filtered) {
+            this.storage.touchChunk(r.chunk.id);
+        }
+
+        // Cache results (only for hybrid mode with embeddings)
+        if (modeUsed === 'hybrid') {
+            try {
+                const queryEmbedding = await this.embedder.embedQuery(query);
+                this.storage.setSemanticCache(
+                    queryHash,
+                    queryEmbedding,
+                    filtered.map((r) => r.chunk.id),
+                    filtered.map((r) => r.score)
+                );
+            } catch {
+                // Don't fail the whole search if caching fails
+            }
+        }
+
+        // Log retrieval for meta-memory
+        this.storage.logRetrieval({
+            query,
+            chunksRetrieved: filtered.map((r) => r.chunk.id),
+            relevanceScores: filtered.map((r) => r.score),
+            wasUseful: null,
+        });
+
+        logger.info(
+            `Search "${query.slice(0, 40)}..." → ${filtered.length} results (mode: ${modeUsed})`
+        );
+
+        return filtered;
+    }
+
+    /** Get the search mode used */
+    get searchMode(): SearchMode {
+        return this.defaultSearchMode;
+    }
+
+    // ----------------------------------------------------------
+    // Search Modes
+    // ----------------------------------------------------------
+
+    private async hybridModeSearch(
+        query: string,
+        options: RecallOptions
+    ): Promise<RetrievalResult[]> {
+        const topK = options.topK ?? RETRIEVAL_CONFIG.defaultTopK;
 
         // 1. Vector Search — semantic similarity
         const vectorResults = await this.vectorSearch(query, topK, options);
@@ -62,7 +165,7 @@ export class HybridSearch {
         const graphResults = this.graphSearch(vectorResults, options);
 
         // 4. Reciprocal Rank Fusion
-        const fused = this.reciprocalRankFusion(
+        return this.reciprocalRankFusion(
             [
                 { results: vectorResults, weight: RETRIEVAL_CONFIG.vectorWeight },
                 { results: keywordResults, weight: RETRIEVAL_CONFIG.keywordWeight },
@@ -70,37 +173,18 @@ export class HybridSearch {
             ],
             topK
         );
+    }
 
-        // 5. Filter by minimum relevance
-        const filtered = fused.filter((r) => r.score >= minRelevance);
-
-        // 6. Touch accessed chunks (boost decay score)
-        for (const r of filtered) {
-            this.storage.touchChunk(r.chunk.id);
+    private async brainModeSearch(
+        query: string,
+        options: RecallOptions
+    ): Promise<RetrievalResult[]> {
+        if (!this.brainSearch) {
+            logger.warn('Brain search requested but no AI provider available — falling back to keyword-only');
+            return this.keywordSearch(query, options.topK ?? RETRIEVAL_CONFIG.defaultTopK, options);
         }
 
-        // 7. Cache results
-        const queryEmbedding = await this.embedder.embedQuery(query);
-        this.storage.setSemanticCache(
-            queryHash,
-            queryEmbedding,
-            filtered.map((r) => r.chunk.id),
-            filtered.map((r) => r.score)
-        );
-
-        // 8. Log retrieval for meta-memory
-        this.storage.logRetrieval({
-            query,
-            chunksRetrieved: filtered.map((r) => r.chunk.id),
-            relevanceScores: filtered.map((r) => r.score),
-            wasUseful: null, // will be updated by feedback
-        });
-
-        logger.info(
-            `Search "${query.slice(0, 40)}..." → ${filtered.length} results (V:${vectorResults.length} K:${keywordResults.length} G:${graphResults.length})`
-        );
-
-        return filtered;
+        return this.brainSearch.search(query, options);
     }
 
     // ----------------------------------------------------------
@@ -150,6 +234,7 @@ export class HybridSearch {
                 vectorScore: s.score,
                 keywordScore: 0,
                 graphScore: 0,
+                brainScore: 0,
                 source: 'vector',
             });
         }
@@ -189,6 +274,7 @@ export class HybridSearch {
                 vectorScore: 0,
                 keywordScore: normalizedScore,
                 graphScore: 0,
+                brainScore: 0,
                 source: 'keyword',
             });
         }
@@ -230,6 +316,7 @@ export class HybridSearch {
                     vectorScore: 0,
                     keywordScore: 0,
                     graphScore,
+                    brainScore: 0,
                     source: 'graph' as const,
                 });
             }
@@ -255,6 +342,7 @@ export class HybridSearch {
                 vectorScore: number;
                 keywordScore: number;
                 graphScore: number;
+                brainScore: number;
             }
         >();
 
@@ -269,6 +357,7 @@ export class HybridSearch {
                     existing.vectorScore = Math.max(existing.vectorScore, r.vectorScore);
                     existing.keywordScore = Math.max(existing.keywordScore, r.keywordScore);
                     existing.graphScore = Math.max(existing.graphScore, r.graphScore);
+                    existing.brainScore = Math.max(existing.brainScore, r.brainScore);
                 } else {
                     fusedScores.set(r.chunk.id, {
                         chunk: r.chunk,
@@ -276,6 +365,7 @@ export class HybridSearch {
                         vectorScore: r.vectorScore,
                         keywordScore: r.keywordScore,
                         graphScore: r.graphScore,
+                        brainScore: r.brainScore,
                     });
                 }
             }

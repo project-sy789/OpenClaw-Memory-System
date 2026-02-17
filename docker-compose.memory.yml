@@ -1,0 +1,47 @@
+# ============================================================
+# OpenClaw Memory System — Docker Compose (Sidecar Mode)
+# ============================================================
+# Usage: docker compose -f docker-compose.memory.yml up
+#
+# This runs OpenClaw Memory as a sidecar alongside your main AI app.
+# Volume mounts ensure memory persists across container restarts.
+# ============================================================
+
+version: '3.8'
+
+services:
+  openclaw-memory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: openclaw-memory
+    restart: unless-stopped
+    
+    volumes:
+      # Persistent memory storage
+      - ./memory:/app/memory
+      # Persistent database
+      - openclaw-db:/app/data
+    
+    environment:
+      # Memory configuration
+      - OPENCLAW_MEMORY_DIR=/app/memory
+      - OPENCLAW_DB_PATH=/app/data/openclaw-memory.db
+      - OPENCLAW_SEARCH_MODE=auto
+      - OPENCLAW_LOG_LEVEL=info
+      
+      # AI Provider config (passed from host)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
+      - MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID:-}
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  openclaw-db:
+    driver: local

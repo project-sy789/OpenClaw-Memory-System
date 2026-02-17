@@ -20,7 +20,18 @@ export const DEFAULT_CONFIG: Omit<Required<OpenClawMemoryConfig>, 'aiProvider'> 
     decayRetentionRate: 0.95,
     mergeThreshold: 0.85,
     logLevel: 'info',
+    searchMode: 'auto',
 };
+
+/** Brain-powered search configuration */
+export const BRAIN_SEARCH_CONFIG = {
+    /** Max candidates to pull from BM25 for brain evaluation */
+    maxCandidates: 30,
+    /** Batch size for LLM relevance judging */
+    batchSize: 10,
+    /** Minimum relevance score to include */
+    minRelevance: 0.2,
+} as const;
 
 /** Resolved (merged) config */
 export function resolveConfig(

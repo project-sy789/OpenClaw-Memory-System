@@ -11,6 +11,7 @@ import {
     DecayResult,
     SessionState,
     HealthStatus,
+    SearchMode,
 } from './types';
 import { resolveConfig } from './config';
 import { setLogLevel } from './utils/logger';
@@ -33,6 +34,7 @@ import { WorkingMemory } from './memory/working-memory';
 import { EpisodicMemory } from './memory/episodic-memory';
 import { SemanticMemory } from './memory/semantic-memory';
 import { ProceduralMemory, Procedure } from './memory/procedural-memory';
+import { MetaMemory, MetaInsights } from './memory/meta-memory';
 
 // Retrieval
 import { HybridSearch } from './retrieval/hybrid-search';
@@ -60,6 +62,7 @@ export class OpenClawMemory {
     private episodicMemory: EpisodicMemory;
     private semanticMemory: SemanticMemory;
     private proceduralMemory: ProceduralMemory;
+    private metaMemory: MetaMemory;
 
     // Retrieval
     private search: HybridSearch;
@@ -133,8 +136,17 @@ export class OpenClawMemory {
         );
         this.proceduralMemory = new ProceduralMemory(this.storage, this.embedder);
 
-        // Initialize retrieval
-        this.search = new HybridSearch(this.storage, this.embedder);
+        // Initialize Meta-Memory (self-reflective tier)
+        this.metaMemory = new MetaMemory(this.storage);
+
+        // Initialize retrieval (with brain search support)
+        const searchMode = (this.config.searchMode ?? 'auto') as SearchMode;
+        this.search = new HybridSearch(
+            this.storage,
+            this.embedder,
+            this.config.aiProvider, // Enables brain-powered search
+            searchMode
+        );
         this.budgetManager = new TokenBudgetManager(this.config.tokenBudget);
 
         // Initialize lifecycle managers
@@ -150,7 +162,7 @@ export class OpenClawMemory {
             this.embedder
         );
 
-        logger.info('OpenClaw Memory System initialized (Delegated AI)');
+        logger.info(`OpenClaw Memory System v2 initialized (mode: ${searchMode})`);
     }
 
     // ============================================================
@@ -260,6 +272,8 @@ export class OpenClawMemory {
         context: string;
         tokensUsed: number;
     }> {
+        const startTime = Date.now();
+
         // Search across all tiers
         const results = await this.search.search(query, options);
 
@@ -270,6 +284,15 @@ export class OpenClawMemory {
 
         // Format as context string
         const context = this.budgetManager.formatContext(allocation);
+
+        // Meta-Memory: log this recall for self-reflection
+        const latencyMs = Date.now() - startTime;
+        const modeUsed = options.searchMode ?? this.search.searchMode ?? 'hybrid';
+        try {
+            this.metaMemory.logQuery(query, results, modeUsed, latencyMs);
+        } catch {
+            // Don't fail the recall if meta-logging fails
+        }
 
         return {
             results: [...allocation.included, ...allocation.headerOnly],
@@ -342,6 +365,16 @@ export class OpenClawMemory {
         return this.storage.getStats();
     }
 
+    /** Get meta-memory insights (self-reflection on memory usage) */
+    getMetaInsights(): MetaInsights {
+        return this.metaMemory.getInsights();
+    }
+
+    /** Get recommended search weights based on usage history */
+    getRecommendedWeights(): { vector: number; keyword: number; graph: number; brain: number } {
+        return this.metaMemory.getRecommendedWeights();
+    }
+
     /** Get embedding cache statistics */
     cacheStats(): { hits: number; misses: number; hitRate: number } {
         return this.embedder.getCacheStats();
@@ -406,8 +439,9 @@ export class OpenClawMemory {
                 embeddingProvider: providerHealth,
                 llmProvider: providerHealth,
             },
-            version: '1.2.0-delegated',
+            version: '2.0.0-brain',
             timestamp: new Date().toISOString(),
+            searchMode: this.search.searchMode,
         };
     }
 
@@ -459,9 +493,11 @@ export {
     EpisodeInput,
     KnowledgeEdge,
     AIProvider,
+    SearchMode,
 } from './types';
 
+export { MetaMemory, MetaInsights } from './memory/meta-memory';
 export { Procedure } from './memory/procedural-memory';
-export { TOKEN_PRESETS, EMBEDDING_MODELS } from './config';
+export { TOKEN_PRESETS, EMBEDDING_MODELS, BRAIN_SEARCH_CONFIG } from './config';
 export { OpenAIProvider } from './providers/openai';
 export { MinimaxProvider } from './providers/minimax';

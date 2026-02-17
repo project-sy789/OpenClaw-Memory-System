@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: openclaw_core
+    restart: unless-stopped
+    user: "1000:1000"
+    depends_on:
+      - chrome
+    volumes:
+      # --- ส่วนที่แก้ไข: เชื่อมโฟลเดอร์ปัจจุบันเข้าไปใน /app ของ Docker ---
+      - .:/app
+      # --------------------------------------------------------
+      - ./data:/home/node/.openclaw
+    environment:
+      - NODE_ENV=development
+      - OPENCLAW_GATEWAY_MODE=local
+      - PORT=18789
+      - BROWSER_WS_ENDPOINT=ws://chrome:3000
+      - OPENCLAW_GATEWAY_TOKEN=set_your_secret_password_here
+      # หมายเหตุ: API Key ของคุณยังอยู่ที่นี่ได้ เพราะนี่คือระดับ Host (แอปหลัก) 
+      # ไม่ใช่ในตัว Code ของ OpenClaw เหมือนเมื่อก่อนแล้วครับ
+      - MINIMAX_API_KEY=sk-cp-ZyUArm6wVL77ImXG-xIesPdyeBSgIQdNrdn4iC9X0qUXFom-lTPpIYp0z98-L1HBez02jJI74KjWbUSEuCC2-c3ffgHMaCgj_RGJtZmIAFBlZclQAsmvsKE
+    ports:
+      - "18789:18789"
+    networks:
+      - openclaw_net
+
+  chrome:
+    image: ghcr.io/browserless/chromium:latest
+    container_name: openclaw_browser
+    restart: unless-stopped
+    environment:
+      - CONNECTION_TIMEOUT=60000
+      - MAX_CONCURRENT_SESSIONS=10
+    ports:
+      - "3000:3000"
+    shm_size: '2gb'
+    networks:
+      - openclaw_net
+
+networks:
+  openclaw_net:
+    driver: bridge

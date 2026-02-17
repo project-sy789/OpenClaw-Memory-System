@@ -80,7 +80,8 @@ export interface RetrievalResult {
     vectorScore: number;     // cosine similarity
     keywordScore: number;    // BM25 score (normalized)
     graphScore: number;      // knowledge graph traversal score
-    source: 'vector' | 'keyword' | 'graph' | 'fused';
+    brainScore: number;      // LLM-judged relevance (brain search)
+    source: 'vector' | 'keyword' | 'graph' | 'brain' | 'fused';
 }
 
 /** Token budget configuration */
@@ -91,6 +92,9 @@ export interface TokenBudget {
     availableForContext: number; // = max - system - response
 }
 
+/** Search mode: 'hybrid' (embedding+BM25), 'brain' (LLM-only), 'auto' (try embedding, fallback to brain) */
+export type SearchMode = 'hybrid' | 'brain' | 'auto';
+
 /** Retrieval query options */
 export interface RecallOptions {
     maxTokens?: number;
@@ -99,6 +103,7 @@ export interface RecallOptions {
     topK?: number;
     minRelevance?: number;     // 0.0 - 1.0
     includeDecayed?: boolean;
+    searchMode?: SearchMode;   // override per-query search mode
     timeRange?: {
         after?: string;  // ISO date
         before?: string; // ISO date
@@ -193,6 +198,8 @@ export interface OpenClawMemoryConfig {
     retryDelay?: number;
     /** Max items per embedding batch (default: 50) */
     batchSize?: number;
+    /** Search mode: 'hybrid' | 'brain' | 'auto' (default: 'auto') */
+    searchMode?: SearchMode;
 }
 
 /** Merge result from auto-merger */
@@ -232,4 +239,5 @@ export interface HealthStatus {
     };
     version: string;
     timestamp: string;
+    searchMode?: SearchMode;
 }

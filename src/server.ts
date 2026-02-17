@@ -281,7 +281,7 @@ app.get('/sessions', (req, res) => {
 // Start session
 app.post('/sessions', (req, res) => {
     try {
-        const { sessionId } = req.body;
+        const { sessionId } = req.body || {};
         const id = sessionId || `session-${randomUUID()}`;
 
         getMemory().startSession(id);
@@ -314,7 +314,7 @@ app.get('/sessions/:id', (req, res) => {
 // Add message to session
 app.post('/sessions/:id/messages', (req, res) => {
     try {
-        const { role, content } = req.body;
+        const { role, content } = req.body || {};
         const sessionId = req.params.id;
 
         if (!role || !content) {

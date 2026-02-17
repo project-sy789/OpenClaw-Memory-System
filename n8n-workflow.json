@@ -26,7 +26,11 @@
                 "bodyParametersUi": {
                     "parameter": [
                         {
-                            "name": "message",
+                            "name": "role",
+                            "value": "user"
+                        },
+                        {
+                            "name": "content",
                             "value": "={{$json[\"message\"][\"text\"]}}"
                         }
                     ]

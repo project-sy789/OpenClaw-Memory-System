@@ -1,4 +1,3 @@
-
 import { AIProvider } from '../types';
 import { logger } from '../utils/logger';
 
@@ -6,6 +5,7 @@ import { logger } from '../utils/logger';
  * Specialized Minimax Provider.
  * Supports Minimax International/Domestic and Anthropic-compatible gateways.
  * Handles Minimax-specific parameter names (texts) and response formats.
+ * Includes robust retry logic for rate limits.
  */
 export class MinimaxProvider implements AIProvider {
     private apiKey: string;
@@ -13,6 +13,8 @@ export class MinimaxProvider implements AIProvider {
     private embedUrl: string;
     private chatModel: string;
     private embedModel: string;
+    private maxRetries: number = 5;
+    private baseDelay: number = 5000; // Start with 5 seconds
 
     constructor(options: {
         apiKey: string;
@@ -32,10 +34,42 @@ export class MinimaxProvider implements AIProvider {
         this.embedModel = options.embedModel || 'embo-01';
     }
 
+    private async sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    private async withRetry<T>(fn: () => Promise<T>, operationName: string): Promise<T> {
+        let lastError: Error | null = null;
+        
+        for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+            try {
+                return await fn();
+            } catch (error: any) {
+                lastError = error;
+                
+                // Check if it's a rate limit error (1002 = rate limit)
+                const isRateLimit = error.message?.includes('1002') || 
+                                   error.message?.includes('rate limit') ||
+                                   error.status === 429;
+                
+                if (isRateLimit && attempt < this.maxRetries) {
+                    // Exponential backoff with jitter
+                    const delay = this.baseDelay * Math.pow(2, attempt - 1) + Math.random() * 2000;
+                    logger.warn(`Minimax ${operationName} rate limited. Retrying in ${Math.round(delay/1000)}s (attempt ${attempt}/${this.maxRetries})...`);
+                    await this.sleep(delay);
+                    continue;
+                }
+                
+                // Not a rate limit or max retries reached
+                throw error;
+            }
+        }
+        
+        throw lastError;
+    }
+
     async embed(texts: string[]): Promise<number[][]> {
-        try {
-            // Minimax International/Domestic often expects 'texts' instead of 'input' 
-            // even on OpenAI-compatible endpoints for certain models.
+        return this.withRetry(async () => {
             const response = await fetch(this.embedUrl, {
                 method: 'POST',
                 headers: {
@@ -44,8 +78,8 @@ export class MinimaxProvider implements AIProvider {
                 },
                 body: JSON.stringify({
                     model: this.embedModel,
-                    texts: texts, // Changed from 'input' to 'texts'
-                    type: 'db',   // Required for Minimax embeddings
+                    texts: texts,
+                    type: 'db',
                 }),
             });
 
@@ -63,7 +97,6 @@ export class MinimaxProvider implements AIProvider {
                 throw error;
             }
 
-            // Minimax returns 'vectors' or 'data[].embedding' depending on endpoint
             if (data.vectors && Array.isArray(data.vectors)) {
                 return data.vectors;
             }
@@ -73,14 +106,11 @@ export class MinimaxProvider implements AIProvider {
             }
 
             throw new Error(`Minimax API Error: Unexpected response format: ${JSON.stringify(data)}`);
-        } catch (error: any) {
-            logger.error(`Minimax Embedding failed: ${error.message}`);
-            throw error;
-        }
+        }, 'Embedding');
     }
 
     async chat(messages: any[], options?: Record<string, any>): Promise<string> {
-        try {
+        return this.withRetry(async () => {
             const response = await fetch(this.chatUrl, {
                 method: 'POST',
                 headers: {
@@ -109,16 +139,13 @@ export class MinimaxProvider implements AIProvider {
             }
 
             return data.choices?.[0]?.message?.content || '';
-        } catch (error: any) {
-            logger.error(`Minimax Chat failed: ${error.message}`);
-            throw error;
-        }
+        }, 'Chat');
     }
 
     async checkHealth() {
         try {
             const start = Date.now();
-            await this.embed(['ping']);
+            await this.embed(['health check']);
             return { status: 'ok' as const, latency: Date.now() - start };
         } catch (e: any) {
             return { status: 'error' as const, message: e.message };

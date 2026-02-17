@@ -17,7 +17,6 @@ import { HealthStatus } from './types';
 import { OpenClawMemory } from './index.js';
 import { MinimaxProvider } from './providers/minimax.js';
 import { OpenAIProvider } from './providers/openai.js';
-import { FastMockProvider } from './providers/fast-mock.js';
 import * as dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
 
@@ -54,11 +53,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Create AI Provider
 const createProvider = () => {
-    // Check if we should use mock (FORCE_MOCK=true in env)
-    if (process.env.FORCE_MOCK === 'true') {
-        console.log('⚠️  FORCE_MOCK enabled - using fast mock provider');
-        return new FastMockProvider(1024);
-    }
+
 
     // Try Minimax first
     if (process.env.MINIMAX_API_KEY && process.env.MINIMAX_API_KEY.length > 10) {
@@ -87,9 +82,7 @@ const createProvider = () => {
         }
     }
 
-    // Default to fast mock
-    console.log('⚠️  No valid API key - using fast mock provider (testing mode)');
-    return new FastMockProvider(1024);
+    throw new Error('❌ Configuration Error: No valid API key found. Please set MINIMAX_API_KEY or OPENAI_API_KEY in .env');
 };
 
 // Memory instance
@@ -152,19 +145,7 @@ app.get('/health', async (req, res) => {
             setTimeout(() => reject(new Error('Timeout')), 5000)
         );
 
-        const health = await Promise.race([healthPromise, timeoutPromise])
-            .catch(() => ({
-                status: 'degraded' as const,
-                error: 'API timeout or rate limited',
-                timestamp: new Date().toISOString(),
-                version: '2.0.0',
-                components: {
-                    database: { status: 'error' },
-                    embeddingProvider: { status: 'error' },
-                    llmProvider: { status: 'error' }
-                }
-            })) as HealthStatus;
-
+        const health = await Promise.race([healthPromise, timeoutPromise]) as HealthStatus;
         res.json(health);
     } catch (error: any) {
         res.status(503).json({

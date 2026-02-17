@@ -27,19 +27,20 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Request logging
+// 1. Logging Middleware (MUST BE FIRST)
 app.use((req, res, next) => {
     const start = Date.now();
+    console.log(`[REQ] ${new Date().toISOString()} ${req.method} ${req.path}`);
     res.on('finish', () => {
         const duration = Date.now() - start;
-        console.log(`${new Date().toISOString()} ${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+        console.log(`[RES] ${new Date().toISOString()} ${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
     });
     next();
 });
+
+// 2. Body Parsers
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Create AI Provider
 const createProvider = () => {
@@ -358,11 +359,16 @@ app.post('/sessions/:id/end', async (req, res) => {
 // Unified Chat API
 app.post('/chat', async (req, res) => {
     try {
+        console.log('[CHAT] Payload:', JSON.stringify(req.body));
         const { message, sessionId } = req.body || {};
 
         if (!message) {
+            console.warn('[CHAT] Missing message in body');
             return res.status(400).json({ error: 'message is required in request body' });
         }
+
+        const reply = await getMemory().chat(message, sessionId);
+        console.log('[CHAT] Reply generated');
 
         const reply = await getMemory().chat(message, sessionId);
 

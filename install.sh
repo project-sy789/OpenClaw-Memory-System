@@ -16,6 +16,20 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}🧠 OpenClaw Memory System Installer${NC}"
 echo "======================================"
 
+# Check if running in a repo or need to clone
+if [ ! -f "docker-compose.memory.yml" ]; then
+    echo -e "\n${YELLOW}📥 Cloning OpenClaw Memory System...${NC}"
+    if [ -d "OpenClaw-Memory-System" ]; then
+        echo -e "${YELLOW}⚠️  Directory OpenClaw-Memory-System already exists. Entering...${NC}"
+        cd OpenClaw-Memory-System
+    else
+        git clone https://github.com/project-sy789/OpenClaw-Memory-System.git
+        cd OpenClaw-Memory-System
+    fi
+else
+    echo -e "${GREEN}✅ Found project files${NC}"
+fi
+
 # Check prerequisites
 echo -e "\n${YELLOW}📋 Checking prerequisites...${NC}"
 
@@ -32,9 +46,7 @@ fi
 
 echo -e "${GREEN}✅ Docker found${NC}"
 
-# Get current directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# Ensure we are in the correct directory (already handled above)
 
 # Check if .env exists
 if [ ! -f .env ]; then
@@ -45,8 +57,14 @@ if [ ! -f .env ]; then
     echo "   (Leave empty to use mock provider for testing)"
     echo ""
     
-    read -p "   Minimax API Key (optional): " MINIMAX_KEY
-    read -p "   OpenAI API Key (optional): " OPENAI_KEY
+    if [ -c /dev/tty ]; then
+        read -p "   Minimax API Key (optional): " MINIMAX_KEY < /dev/tty
+        read -p "   OpenAI API Key (optional): " OPENAI_KEY < /dev/tty
+    else
+        echo -e "${YELLOW}⚠️  Non-interactive mode. Skipping API key setup.${NC}"
+        MINIMAX_KEY=""
+        OPENAI_KEY=""
+    fi
     
     # Create .env file
     cat > .env << EOF
@@ -110,7 +128,11 @@ echo "   docker exec -it openclaw-memory node dist/cli.js interactive"
 echo ""
 
 # Ask to start
-read -p "Start now? (y/n): " -n 1 -r
+if [ -c /dev/tty ]; then
+    read -p "Start now? (y/n): " -n 1 -r < /dev/tty
+else
+    REPLY="n"
+fi
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     docker-compose up -d

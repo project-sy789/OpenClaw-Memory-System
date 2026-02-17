@@ -370,8 +370,6 @@ app.post('/chat', async (req, res) => {
         const reply = await getMemory().chat(message, sessionId);
         console.log('[CHAT] Reply generated');
 
-        const reply = await getMemory().chat(message, sessionId);
-
         res.json({
             reply,
             sessionId: sessionId || 'default-chat',

@@ -1,76 +1,96 @@
 # 🧠 OpenClaw Memory System
 
-ระบบความจำ AI ที่ทรงพลังที่สุด — ติดตั้งง่ายๆ แค่ pull แล้วรัน
+ระบบความจำ AI ที่ทรงพลังที่สุด — ติดตั้งง่ายและยืดหยุ่น
 
 [English](./README.en.md) | [ภาษาไทย](./README.md)
 
 ---
 
-## ⚡ Quick Start (3 ขั้นตอน)
+## 📦 Installation Options
 
-### 1. Pull & Run
+OpenClaw รองรับการติดตั้ง 2 รูปแบบหลัก:
+
+### Option A: Docker Service (Recommended)
+เหมาะสำหรับรันเป็น Service แยก (Sidecar) คู่กับแอพพลิเคชันของคุณ ง่ายและจัดการ environment ได้สะดวก
+
+1. **Clone & Setup:**
+   ```bash
+   git clone https://github.com/project-sy789/OpenClaw-Memory-System.git
+   cd OpenClaw-Memory-System
+   cp .env.example .env
+   # แก้ไข .env ใส่ API Key ของคุณ
+   ```
+
+2. **Run:**
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Use CLI (via Docker):**
+   ```bash
+   # ดูสถิติ
+   docker exec -it openclaw-memory openclaw stats
+   
+   # บันทึกความจำ
+   docker exec -it openclaw-memory openclaw remember "Boss loves coffee" preference
+   
+   # ค้นหา
+   docker exec -it openclaw-memory openclaw recall "what does boss like"
+   ```
+
+---
+
+### Option B: Standalone Library / Local
+เหมาะสำหรับ Developer ที่ต้องการ import ไปใช้ใน Code TypeScript/Node.js หรือรันบนเครื่องโดยตรง
+
+1. **Install Dependencies:**
+   ```bash
+   npm install
+   npm run build
+   ```
+
+2. **Run CLI Locally:**
+   ```bash
+   # ผ่าน npm script
+   npm run cli stats
+   
+   # หรือ link เพื่อเรียกคำสั่ง openclaw ทั่วเครื่อง
+   npm link
+   openclaw interactive
+   ```
+
+3. **Import Library:**
+   ```typescript
+   import { OpenClawMemory } from './dist'; // หรือ path ที่ถูกต้อง
+   // ... usage ...
+   ```
+
+---
+
+## ⚡ Quick Start (ติดตั้งแบบด่วน)
 
 ```bash
 # Clone
 git clone https://github.com/project-sy789/OpenClaw-Memory-System.git
 cd OpenClaw-Memory-System
 
-# Run installer (จะถาม API Key หรือจะข้ามได้)
+# Run Installer (Interactive Setup)
 ./install.sh
-```
-
-**หรือแค่นี้ก็ได้:**
-
-```bash
-git clone https://github.com/project-sy789/OpenClaw-Memory-System.git
-cd OpenClaw-Memory-System
-cp .env.example .env
-# แก้ .env ใส่ API Key ของคุณ
-docker-compose up -d
-```
-
-### 2. ใส่ API Key (ถ้ามี)
-
-```bash
-nano .env
-```
-
-เลือก provider:
-- **Minimax** (แนะนำ ราคาถูก): ใส่ `MINIMAX_API_KEY`
-- **OpenAI**: ใส่ `OPENAI_API_KEY`
-
-ถ้าไม่ใส่ API Key ระบบจะใช้ Mock Mode (สำหรับทดสอบ)
-
-### 3. ใช้งาน!
-
-```bash
-# ดูสถิติ
-docker exec -it openclaw-memory node dist/cli.js stats
-
-# บันทึกความจำ
-docker exec -it openclaw-memory node dist/cli.js remember "Boss loves coffee" preference
-
-# ค้นหา
-docker exec -it openclaw-memory node dist/cli.js recall "what does boss like"
-
-# โหมดโต้ตอบ
-docker exec -it openclaw-memory node dist/cli.js interactive
 ```
 
 ---
 
 ## 📖 CLI Commands
 
+รองรับทั้งผ่าน Docker และ Local (`openclaw` หรือ `npm run cli`)
+
 | Command | Example | Description |
 |---------|---------|-------------|
-| `stats` | `cli.js stats` | แสดงสถิติความจำ |
-| `remember` | `cli.js remember "text" tag1 tag2` | บันทึกความจำ |
-| `recall` | `cli.js recall "query"` | ค้นหาความจำ |
-| `session start` | `cli.js session start my-session` | เริ่ม session |
-| `session end` | `cli.js session end` | จบ session |
-| `chat` | `cli.js chat user "message"` | เพิ่มข้อความ |
-| `health` | `cli.js health` | เช็คสถานะระบบ |
-| `interactive` | `cli.js interactive` | โหมดโต้ตอบ |
+| `stats` | `openclaw stats` | แสดงสถิติความจำและ Meta-Memory Insights |
+| `remember` | `openclaw remember "text" tag` | บันทึกความจำใหม่ |
+| `recall` | `openclaw recall "query"` | ค้นหาความจำ (รองรับ -m brain/hybrid/auto) |
+| `health` | `openclaw health` | เช็คสถานะระบบและ API Connection |
+| `interactive` | `openclaw interactive` | โหมด Chat โต้ตอบกับความจำ |
 
 ---
 
@@ -81,90 +101,30 @@ docker exec -it openclaw-memory node dist/cli.js interactive
 ```bash
 # AI Provider - เลือกอันใดอันหนึ่ง
 
-# Option 1: Minimax (แนะนำ)
+# Option 1: Minimax (แนะนำ - ประหยัด)
 MINIMAX_API_KEY=your-key-here
 MINIMAX_BASE_URL=https://api.minimaxi.chat/v1
-EMBEDDING_MODEL=embo-01
+# EMBEDDING_MODEL=embo-01
 
 # Option 2: OpenAI  
 OPENAI_API_KEY=sk-...
 
-# Settings
+# System Settings
 MEMORY_DIR=./memory
 TOKEN_BUDGET=4000
 LOG_LEVEL=info
-```
-
----
-
-## 🐳 Docker Commands
-
-```bash
-# Start
-docker-compose up -d
-
-# Stop
-docker-compose down
-
-# View logs
-docker-compose logs -f
-
-# Rebuild
-docker-compose build --no-cache
-
-# CLI inside container
-docker exec -it openclaw-memory sh
-```
-
----
-
-## 🔌 Integration with OpenClaw
-
-ใช้เป็น library ในโค้ด:
-
-```typescript
-import { OpenClawMemory } from 'openclaw-memory';
-import { MinimaxProvider } from 'openclaw-memory/providers/minimax';
-
-const memory = new OpenClawMemory({
-    aiProvider: new MinimaxProvider({ apiKey: 'your-key' }),
-    memoryDir: './memory'
-});
-
-// บันทึก
-await memory.rememberFact('User likes dark mode', ['preference']);
-
-// ค้นหา
-const result = await memory.recall('user preferences');
-```
-
----
-
-## 📁 Project Structure
-
-```
-OpenClaw-Memory-System/
-├── src/              # Source code
-├── test/             # Unit tests  
-├── memory/           # SQLite database (สร้างอัตโนมัติ)
-├── logs/             # Log files
-├── cli.ts            # CLI interface
-├── Dockerfile        # Docker image
-├── docker-compose.yml # Docker compose
-├── install.sh        # Installer script
-└── .env.example     # ตัวอย่าง config
+SEARCH_MODE=auto  # auto, brain, hybrid
 ```
 
 ---
 
 ## 🚀 Features
 
-- ✅ 5-Tier Memory (Working, Episodic, Semantic, Procedural, Meta)
-- ✅ Hybrid Search (Vector + BM25 + Knowledge Graph)
-- ✅ Thai Language Support
-- ✅ Memory Decay & Consolidation
-- ✅ Token Budget Management
-- ✅ Docker-native Deployment
+- ✅ **5-Tier Memory** (Working, Episodic, Semantic, Procedural, **Meta**)
+- ✅ **Brain-Powered Search** (ค้นหาไม่ต้องใช้ Embedding API)
+- ✅ **Hybrid Search** (Vector + BM25 + Knowledge Graph)
+- ✅ **Thai Language Support**
+- ✅ **Docker-native** Deployment
 
 ---
 

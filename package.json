@@ -1,33 +1,18 @@
 {
   "name": "openclaw-memory",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Advanced tiered memory system for AI agents — long-term memory with vector search, semantic chunking, and token-efficient retrieval",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "memory": "./dist/cli.js"
+    "openclaw": "./dist/cli.js"
   },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist",
-    "README.md",
-    ".env.example"
-  ],
   "scripts": {
     "build": "tsc",
-    "build:cli": "tsc cli.ts --outDir dist --esModuleInterop --module NodeNext --moduleResolution NodeNext",
     "prepare": "echo 'skip prepare'",
     "dev": "tsx watch src/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "demo": "tsx src/demo.ts",
-    "cli": "tsx cli.ts",
+    "cli": "tsx src/cli.ts",
     "setup": "tsx scripts/setup.ts",
     "health": "tsx src/scripts/health-check.ts",
     "update": "git pull && npm install && npm run build",
@@ -52,6 +37,7 @@
   "dependencies": {
     "@types/cors": "^2.8.19",
     "better-sqlite3": "^11.7.0",
+    "commander": "^14.0.3",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
     "openai": "^4.77.0",

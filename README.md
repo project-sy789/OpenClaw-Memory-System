@@ -9,11 +9,13 @@
 ## 📦 Installation Options
 
 ### ⚡ วิธีง่ายที่สุด (สำหรับคนที่มี OpenClaw Docker อยู่แล้ว)
-ไม่ต้องเขียนโค้ด! แค่รันคำสั่งเดียว ระบบจะติดตั้ง Memory System ให้ทำงานคู่กันทันที:
+ไม่ต้องเขียนโค้ด! แค่รันชุดคำสั่งนี้ใน Folder เดียวกับ OpenClaw:
 
 ```bash
-# Copy คำสั่งนี้ไปรันใน Terminal (โฟลเดอร์เดียวกับ OpenClaw)
-curl -sL https://raw.githubusercontent.com/project-sy789/OpenClaw-Memory-System/main/install.sh | bash
+# 1. Download & Install
+git clone https://github.com/project-sy789/OpenClaw-Memory-System.git
+cd OpenClaw-Memory-System
+bash install.sh
 ```
 > ระบบจะถาม API Key นิดหน่อย แล้วเริ่มทำงานให้เลยที่ `http://localhost:3001`
 

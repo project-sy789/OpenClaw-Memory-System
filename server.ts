@@ -142,12 +142,20 @@ app.get('/api', (req, res) => {
     });
 });
 
-// Health check
+// Health check (with timeout to avoid blocking)
 app.get('/health', async (req, res) => {
     try {
-        const health = await getMemory().health();
+        // Quick health check - don't wait for API if rate limited
+        const healthPromise = getMemory().health();
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 5000)
+        );
+        
+        const health = await Promise.race([healthPromise, timeoutPromise])
+            .catch(() => ({ status: 'degraded' as const, error: 'API timeout or rate limited' }));
+        
         res.json({
-            status: 'ok',
+            status: health.status || 'degraded',
             timestamp: new Date().toISOString(),
             ...health
         });

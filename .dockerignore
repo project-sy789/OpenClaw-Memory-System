@@ -1,8 +1,7 @@
-# Dependencies
-node_modules
-npm-debug.log
+# Dependencies - DON'T exclude! Need for build
+# node_modules
 
-# Build outputs
+# Build outputs - exclude initially
 dist
 *.tsbuildinfo
 
@@ -32,8 +31,11 @@ memory/*
 test
 coverage
 
-# Misc
+# Docs to exclude
 *.md
 !README.md
+
+# Environment
 .env
 .env.local
+.env.example

@@ -1,30 +1,36 @@
-FROM node:18-alpine
+FROM node:18-bookworm-slim
 
 # Install build dependencies for better-sqlite3
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies (including dev for TypeScript)
+# Install ALL dependencies
 RUN npm install
 
-# Copy source
-COPY . .
+# Copy source code
+COPY src/ ./src/
+COPY cli.ts ./
+COPY server.ts ./
+COPY export.ts ./
+COPY dashboard.html ./
+COPY docker-entrypoint.sh ./
+COPY tsconfig.json ./
+COPY .env.example ./
 
 # Build TypeScript
-RUN npm run build
+RUN npx tsc
 
-# Create directories
-RUN mkdir -p /app/memory /app/logs
-
-# Set entrypoint
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Create directories  
+RUN mkdir -p memory logs
 
 EXPOSE 3001
 
-ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["stats"]
+CMD ["node", "dist/cli.js"]

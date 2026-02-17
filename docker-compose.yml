@@ -16,28 +16,30 @@ services:
       dockerfile: Dockerfile
     container_name: openclaw-memory
     restart: unless-stopped
-    
+    ports:
+      - "3001:3001"
+
     volumes:
       # Persistent memory storage
       - ./memory:/app/memory
       # Persistent database
       - openclaw-db:/app/data
-    
+
     environment:
       # Memory configuration
       - OPENCLAW_MEMORY_DIR=/app/memory
       - OPENCLAW_DB_PATH=/app/data/openclaw-memory.db
       - OPENCLAW_SEARCH_MODE=auto
       - OPENCLAW_LOG_LEVEL=info
-      
+
       # AI Provider config (passed from host)
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
       - MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID:-}
-    
+
     # Health check
     healthcheck:
-      test: ["CMD", "node", "-e", "console.log('healthy')"]
+      test: [ "CMD", "node", "-e", "console.log('healthy')" ]
       interval: 30s
       timeout: 10s
       retries: 3

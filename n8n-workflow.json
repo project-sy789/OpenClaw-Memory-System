@@ -20,18 +20,18 @@
         {
             "parameters": {
                 "requestMethod": "POST",
-                "url": "http://88.99.168.204:3001/sessions/{{$json[\"message\"][\"chat\"][\"id\"]}}/messages",
+                "url": "http://127.0.0.1:3001/chat",
                 "jsonParameters": true,
                 "options": {},
                 "bodyParametersUi": {
                     "parameter": [
                         {
-                            "name": "role",
-                            "value": "user"
+                            "name": "message",
+                            "value": "={{$json[\"message\"][\"text\"]}}"
                         },
                         {
-                            "name": "content",
-                            "value": "={{$json[\"message\"][\"text\"]}}"
+                            "name": "sessionId",
+                            "value": "={{$json[\"message\"][\"chat\"][\"id\"]}}"
                         }
                     ]
                 }
@@ -47,7 +47,7 @@
         {
             "parameters": {
                 "chatId": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"chat\"][\"id\"]}}",
-                "text": "={{$node[\"Chat with Memory\"].json[\"response\"]}}",
+                "text": "={{$node[\"Chat with Memory\"].json[\"reply\"]}}",
                 "additionalFields": {
                     "parse_mode": "Markdown"
                 }

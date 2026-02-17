@@ -302,6 +302,49 @@ export class OpenClawMemory {
     }
 
     /**
+     * Unified Chat API: Recalls memory, formats context, and generates a response.
+     * This is the recommended entry point for chatbots (Telegram, Discord, etc.)
+     */
+    async chat(message: string, sessionId?: string): Promise<string> {
+        const sid = sessionId || 'default-chat';
+
+        // 1. Ensure session is started
+        if (!this.workingMemory.isActive() || this.workingMemory.getSessionState()?.sessionId !== sid) {
+            this.startSession(sid);
+        }
+
+        // 2. Add user message to working memory
+        this.addMessage('user', message);
+
+        // 3. Recall relevant context from memory tiers
+        const { context } = await this.recall(message);
+
+        // 4. Construct prompt for AI
+        const messages = [
+            {
+                role: 'system',
+                content: `You are a helpful AI assistant with access to a memory system.
+Your goal is to answer questions using the provided context.
+If the context doesn't contain the answer, use your general knowledge but mention it's not in your specific memory.
+
+## Relevant Context from Memory:
+${context}
+
+## Recent Conversation History:
+${this.getWorkingContext(2000)}`
+            }
+        ];
+
+        // 5. Generate response from AI Provider
+        const response = await this.config.aiProvider.chat(messages);
+
+        // 6. Add assistant response to working memory
+        this.addMessage('assistant', response);
+
+        return response;
+    }
+
+    /**
      * Quick recall — returns just the context string (most common usage).
      */
     async recallContext(

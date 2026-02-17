@@ -109,6 +109,26 @@ cd OpenClaw-Memory-System
 
 ---
 
+### 🤖 เชื่อมต่อกับ Telegram ผ่าน n8n
+ถ้าคุณมี n8n รันอยู่ใน Docker เดียวกัน (หรือ Network เดียวกัน) สามารถเรียกใช้ได้ทันที:
+
+**1. Add Memory (สั่งให้จำ):**
+- **Node:** HTTP Request
+- **Method:** POST
+- **URL:** `http://openclaw-memory:3001/facts`
+- **Body:** JSON
+  ```json
+  { "content": "{{ $json.message.text }}" }
+  ```
+
+**2. Recall (สั่งให้นึก):**
+- **Node:** HTTP Request
+- **Method:** GET
+- **URL:** `http://openclaw-memory:3001/recall`
+- **Query Parameter:** `q` = `{{ $json.message.text }}`
+
+> **Tip:** ชื่อ Host `openclaw-memory` ใช้ได้เฉพาะใน Docker Network เดียวกัน ถ้าอยู่นอก Docker ให้ใช้ IP เครื่องครับ
+
 ## 🔧 Configuration
 
 สร้างไฟล์ `.env`:

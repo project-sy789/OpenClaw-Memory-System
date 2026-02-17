@@ -131,6 +131,7 @@ app.get('/api', (req, res) => {
                 messages: 'POST /sessions/:id/messages',
                 end: 'POST /sessions/:id/end'
             },
+            chat: 'POST /chat',
             recent: 'GET /recent'
         }
     });
@@ -361,6 +362,31 @@ app.post('/sessions/:id/end', async (req, res) => {
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Unified Chat API
+app.post('/chat', async (req, res) => {
+    try {
+        const { message, sessionId } = req.body || {};
+
+        if (!message) {
+            return res.status(400).json({ error: 'message is required in request body' });
+        }
+
+        const reply = await getMemory().chat(message, sessionId);
+
+        res.json({
+            reply,
+            sessionId: sessionId || 'default-chat',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error: any) {
+        console.error('Chat Error:', error);
+        res.status(500).json({
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 

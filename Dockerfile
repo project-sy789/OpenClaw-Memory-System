@@ -23,4 +23,4 @@ RUN mkdir -p memory logs
 
 EXPOSE 3001
 
-CMD ["node", "dist/cli.js"]
+CMD ["node", "dist/server.js"]

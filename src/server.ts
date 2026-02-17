@@ -12,19 +12,18 @@
 
 import express from 'express';
 // import cors from 'cors';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { OpenClawMemory } from './src/index.js';
-import { MinimaxProvider } from './src/providers/minimax.js';
-import { OpenAIProvider } from './src/providers/openai.js';
-import { FastMockProvider } from './src/providers/fast-mock.js';
+import { join } from 'path';
+import { HealthStatus } from './types';
+import { OpenClawMemory } from './index.js';
+import { MinimaxProvider } from './providers/minimax.js';
+import { OpenAIProvider } from './providers/openai.js';
+import { FastMockProvider } from './providers/fast-mock.js';
 import * as dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// using CommonJS __dirname
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -60,7 +59,7 @@ const createProvider = () => {
         console.log('⚠️  FORCE_MOCK enabled - using fast mock provider');
         return new FastMockProvider(1024);
     }
-    
+
     // Try Minimax first
     if (process.env.MINIMAX_API_KEY && process.env.MINIMAX_API_KEY.length > 10) {
         try {
@@ -73,19 +72,21 @@ const createProvider = () => {
             console.log('⚠️  Minimax failed, falling back to mock');
         }
     }
-    
+
     // Try OpenAI
     if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 10) {
         try {
-            return new OpenAIProvider({
-                apiKey: process.env.OPENAI_API_KEY,
-                model: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
-            });
+            return new OpenAIProvider(
+                process.env.OPENAI_API_KEY,
+                undefined,
+                undefined,
+                process.env.EMBEDDING_MODEL || 'text-embedding-3-small'
+            );
         } catch (e) {
             console.log('⚠️  OpenAI failed, falling back to mock');
         }
     }
-    
+
     // Default to fast mock
     console.log('⚠️  No valid API key - using fast mock provider (testing mode)');
     return new FastMockProvider(1024);
@@ -97,7 +98,7 @@ let memory: OpenClawMemory;
 const getMemory = () => {
     if (!memory) {
         const provider = createProvider();
-        
+
         memory = new OpenClawMemory({
             aiProvider: provider,
             memoryDir: process.env.MEMORY_DIR || './memory',
@@ -147,18 +148,24 @@ app.get('/health', async (req, res) => {
     try {
         // Quick health check - don't wait for API if rate limited
         const healthPromise = getMemory().health();
-        const timeoutPromise = new Promise((_, reject) => 
+        const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Timeout')), 5000)
         );
-        
+
         const health = await Promise.race([healthPromise, timeoutPromise])
-            .catch(() => ({ status: 'degraded' as const, error: 'API timeout or rate limited' }));
-        
-        res.json({
-            status: health.status || 'degraded',
-            timestamp: new Date().toISOString(),
-            ...health
-        });
+            .catch(() => ({
+                status: 'degraded' as const,
+                error: 'API timeout or rate limited',
+                timestamp: new Date().toISOString(),
+                version: '2.0.0',
+                components: {
+                    database: { status: 'error' },
+                    embeddingProvider: { status: 'error' },
+                    llmProvider: { status: 'error' }
+                }
+            })) as HealthStatus;
+
+        res.json(health);
     } catch (error: any) {
         res.status(503).json({
             status: 'error',
@@ -188,9 +195,9 @@ app.get('/facts', (req, res) => {
     try {
         // For now, use recall with empty query to get all
         // TODO: Add dedicated list method
-        res.json({ 
+        res.json({
             message: 'Use /recall?q= to search facts',
-            suggestion: 'GET /recall?q=' 
+            suggestion: 'GET /recall?q='
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -201,24 +208,24 @@ app.get('/facts', (req, res) => {
 app.post('/facts', async (req, res) => {
     try {
         const { content, tags, importance } = req.body;
-        
+
         if (!content) {
             return res.status(400).json({ error: 'content is required' });
         }
-        
+
         if (typeof content !== 'string') {
             return res.status(400).json({ error: 'content must be a string' });
         }
-        
+
         if (content.length > 10000) {
             return res.status(400).json({ error: 'content too long (max 10000 chars)' });
         }
-        
+
         const finalTags = Array.isArray(tags) ? tags : [];
         const finalImportance = typeof importance === 'number' ? importance : 0.7;
-        
+
         await getMemory().rememberFact(content, finalTags, finalImportance);
-        
+
         res.status(201).json({
             success: true,
             content,
@@ -237,23 +244,23 @@ app.post('/facts', async (req, res) => {
 // Search/Recall memories
 app.get('/recall', async (req, res) => {
     try {
-        const query = req.query.q || req.query.query || '';
-        const maxTokens = req.query.maxTokens 
-            ? parseInt(req.query.maxTokens as string) 
+        const query = (req.query.q || req.query.query || '') as string;
+        const maxTokens = req.query.maxTokens
+            ? parseInt(req.query.maxTokens as string)
             : undefined;
         const topK = req.query.topK
             ? parseInt(req.query.topK as string)
             : undefined;
-            
+
         if (!query) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: 'q (query) parameter required',
                 example: '/recall?q=what+does+boss+like'
             });
         }
-        
+
         const result = await getMemory().recall(query, { maxTokens, topK });
-        
+
         res.json({
             query,
             context: result.context,
@@ -263,7 +270,7 @@ app.get('/recall', async (req, res) => {
                 score: r.score,
                 tier: r.chunk.tier,
                 tags: r.chunk.tags,
-                importance: r.chunk.importance,
+                importance: r.chunk.importanceScore,
                 createdAt: r.chunk.createdAt
             })),
             tokensUsed: result.tokensUsed,
@@ -295,15 +302,15 @@ app.post('/sessions', (req, res) => {
     try {
         const { sessionId } = req.body;
         const id = sessionId || `session-${randomUUID()}`;
-        
+
         getMemory().startSession(id);
-        
+
         activeSessions.set(id, {
             id,
             messages: [],
             startedAt: new Date().toISOString()
         });
-        
+
         res.status(201).json({
             success: true,
             sessionId: id,
@@ -328,24 +335,24 @@ app.post('/sessions/:id/messages', (req, res) => {
     try {
         const { role, content } = req.body;
         const sessionId = req.params.id;
-        
+
         if (!role || !content) {
             return res.status(400).json({ error: 'role and content required' });
         }
-        
+
         if (!['user', 'assistant', 'system'].includes(role)) {
             return res.status(400).json({ error: 'role must be user, assistant, or system' });
         }
-        
+
         getMemory().addMessage(role, content);
-        
+
         // Track locally
         const session = activeSessions.get(sessionId);
         if (session) {
             session.messages = session.messages || [];
             session.messages.push({ role, content, timestamp: new Date().toISOString() });
         }
-        
+
         res.json({
             success: true,
             sessionId,
@@ -361,11 +368,11 @@ app.post('/sessions/:id/messages', (req, res) => {
 app.post('/sessions/:id/end', async (req, res) => {
     try {
         const sessionId = req.params.id;
-        
+
         await getMemory().endSession();
-        
+
         activeSessions.delete(sessionId);
-        
+
         res.json({
             success: true,
             sessionId,

@@ -1,0 +1,90 @@
+{
+    "name": "OpenClaw Memory Chat",
+    "nodes": [
+        {
+            "parameters": {
+                "updates": [
+                    "message"
+                ],
+                "additionalFields": {}
+            },
+            "name": "Telegram Trigger",
+            "type": "n8n-nodes-base.telegramTrigger",
+            "typeVersion": 1,
+            "position": [
+                460,
+                300
+            ],
+            "webhookId": "2c5e5e6e-openclaw-memory-trigger"
+        },
+        {
+            "parameters": {
+                "requestMethod": "POST",
+                "url": "http://88.99.168.204:3001/sessions/{{$json[\"message\"][\"chat\"][\"id\"]}}/messages",
+                "jsonParameters": true,
+                "options": {},
+                "bodyParametersUi": {
+                    "parameter": [
+                        {
+                            "name": "message",
+                            "value": "={{$json[\"message\"][\"text\"]}}"
+                        }
+                    ]
+                }
+            },
+            "name": "Chat with Memory",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 1,
+            "position": [
+                680,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "chatId": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"chat\"][\"id\"]}}",
+                "text": "={{$node[\"Chat with Memory\"].json[\"response\"]}}",
+                "additionalFields": {
+                    "parse_mode": "Markdown"
+                }
+            },
+            "name": "Reply to Telegram",
+            "type": "n8n-nodes-base.telegram",
+            "typeVersion": 1,
+            "position": [
+                900,
+                300
+            ],
+            "credentials": {
+                "telegramApi": {
+                    "id": "YOUR_CREDENTIAL_ID_HERE",
+                    "name": "Telegram Account"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "Telegram Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Chat with Memory",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat with Memory": {
+            "main": [
+                [
+                    {
+                        "node": "Reply to Telegram",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

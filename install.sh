@@ -39,12 +39,16 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+else
     echo -e "${RED}❌ Docker Compose is not installed${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Docker found${NC}"
+echo -e "${GREEN}✅ Docker found (using $DOCKER_COMPOSE_CMD)${NC}"
 
 # Ensure we are in the correct directory (already handled above)
 
@@ -115,10 +119,10 @@ echo -e "\n${BLUE}🎉 Installation Complete!${NC}"
 echo "======================================"
 echo ""
 echo -e "${GREEN}Quick Start:${NC}"
-echo "   docker-compose up -d"
+echo "   $DOCKER_COMPOSE_CMD up -d"
 echo ""
 echo -e "${GREEN}View Logs:${NC}"
-echo "   docker-compose logs -f"
+echo "   $DOCKER_COMPOSE_CMD logs -f"
 echo ""
 echo -e "${GREEN}CLI Usage:${NC}"
 echo "   docker exec -it openclaw-memory node dist/cli.js stats"
@@ -135,6 +139,6 @@ else
 fi
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    docker-compose up -d
-    echo -e "\n${GREEN}✅ Running! Check: docker-compose logs -f${NC}"
+    $DOCKER_COMPOSE_CMD up -d
+    echo -e "\n${GREEN}✅ Running! Check: $DOCKER_COMPOSE_CMD logs -f${NC}"
 fi
